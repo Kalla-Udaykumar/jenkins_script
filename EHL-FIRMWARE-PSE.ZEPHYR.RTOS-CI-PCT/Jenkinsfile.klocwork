@@ -1,0 +1,656 @@
+#!groovy
+
+def STS_CS = ""
+def STS_BUILD = "FAILED"
+def STS_KW = "FAILED"
+
+def getConfig() {
+	props = readYaml file: "${WORKSPACE}/engservices/tools/github/PRdetails.json"
+	sourceBranch = "${props.head.ref}"
+	ghprbTargetBranch = "${props.base.ref}"
+}
+
+def download_zephyriotg() {
+	checkout([$class: 'GitSCM',
+	userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/os.rtos.zephyr.iot.zephyr-ia.git']],
+	branches: [[name: "refs/heads/main"]],
+	extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'zephyr-ia'],
+	[$class: 'ScmName', name: 'zephyr-iotg'],
+	[$class: 'CleanBeforeCheckout']]])
+}
+
+def download_zephyriotg_rpl() {
+	checkout([$class: 'GitSCM',
+	userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/os.rtos.zephyr.iot.zephyr-ia.git']],
+	branches: [[name: "refs/heads/rpl_dev"]],
+	extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'zephyr-ia'],
+	[$class: 'ScmName', name: 'zephyr-iotg'],
+	[$class: 'CleanBeforeCheckout']]])
+}
+
+def getPRID() {
+	if (env.ghprbPullId) {
+		PR_ID = "${ghprbPullId}"
+	} else {
+		PR_ID = "${ghprbCommentId}"
+	}
+}
+
+def download_kwc() {
+        dir("${WORKSPACE}/engservices/tools/klocwork") {
+		sh """
+		${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/ehl_pse-fw && kwxsync --tag --copy ${KW_URL}/GEN-LIN-EHL.PSE ${KW_URL}/${KW_PROJ_PSE_CI}'
+		"""
+	}
+	dir("${WORKSPACE}") {
+		sh """
+		#!/bin/bash -e -x
+		${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr && source zephyr-env.sh && cd ${WORKSPACE}/ehl_pse-fw && kwinject -w -o ${WORKSPACE}/kwinject.out ./build.sh kw_scan'
+		"""
+	}
+	dir("${WORKSPACE}/engservices/tools/klocwork") {
+		sh """
+		${DOCKER_RUN_CMD_BUILD} bash -c "export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/engservices/tools/klocwork && python kwbuild.py --project "${KW_PROJ_PSE_CI}" --buildspec ${WORKSPACE}/kwinject.out --ignore"
+		"""
+	}
+	dir("${WORKSPACE}/engservices/tools/klocwork") {
+		sh """#!/bin/bash -xe
+		${DOCKER_RUN_CMD_BUILD} bash -c "export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/engservices/tools/klocwork && \
+		python3 -m klocwork_report -u ${KW_URL}/${KW_PROJ_PSE_CI} -o ${WORKSPACE}/engservices/tools/klocwork -s --html"
+		"""
+	}
+	script {
+		ISSUES = sh(script:"grep -w 'Total Open Issues' ${WORKSPACE}/engservices/tools/klocwork/kw_report.txt", returnStdout:true).trim()
+		if("${ISSUES}" == "Total Open Issues      : 0") {
+			dir("${WORKSPACE}/engservices/tools/klocwork") {
+				sh """
+				${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE} && kwxsync --tag --copy ${KW_URL}/${KW_PROJ_PSE_CI} ${KW_URL}/GEN-LIN-EHL.PSE'
+				"""
+				STS_KW = "PASSED"
+			}
+		} 
+		else {
+		  error('KLOCWORK FAILED! There are Open KW issues. Please resolve and trigger the CI again.')
+		}
+	}
+}
+
+pipeline {
+	agent {
+		node {
+			label 'ESC-DOCKER-UB16'
+		}
+	}
+
+	environment {
+		DATETIME = new Date().format("yyyy'_WW'ww'.'u");
+		TIME = new Date().format("yyyyMMdd-HHmm");
+		ZEPHYR_TOOLCHAIN_VARIANT = 'zephyr';
+		ZEPHYR_SDK_INSTALL_DIR = '/opt/zephyr-sdk';		   
+		API_ID = credentials('github-api-token')
+		REPO_TOOL_PATH = "/nfs/png/home/lab_bldmstr/bin";
+		KW_URL = 'https://klocwork-png7.devtools.intel.com:8105';
+		KW_PROJ = "GEN-LIN-ZEPHYR.RTOS.IOTG"
+		KW_PROJ_CI = "GEN-LIN-ZEPHYR.IOT-ZEPHYR-CI"
+		KW_PROJ_PSE_CI = 'GEN-LIN-EHL.PSE.ZEPHYR-CI'
+		HOST_LTOKEN = "/nfs/png/home/lab_bldmstr/.klocwork/ltoken";
+		NFS_KW_INSTALLER = "/nfs/png/disks/ecg_es_disk2";
+		
+		DOCKER_RUN_CMD_FETCH="docker run --rm  -e LOCAL_USER=lab_bldmstr -e LOCAL_USER_ID=`id -u` -e LOCAL_GROUP_ID=`id -g` \
+			-e ftp_proxy='http://proxy-dmz.intel.com:911' \
+			-e ZEPHYR_TOOLCHAIN_VARIANT='zephyr' \
+			-e ZEPHYR_SDK_INSTALL_DIR='/opt/zephyr-sdk' \
+			-e KW_URL=${KW_URL} \
+			-v ${WORKSPACE}:${WORKSPACE} \
+			-v ${WORKSPACE}/.ccache:/home/lab_bldmstr/.ccache \
+			-v ${WORKSPACE}/.cache:/home/lab_bldmstr/.cache \
+			-v /nfs/png/home/lab_bldmstr:/home/lab_bldmstr \
+			-v /nfs/png/home/lab_bldmstr/.netrc:/home/lab_bldmstr/.netrc \
+			-v /nfs/png/home/lab_bldmstr/.gitconfig:/home/lab_bldmstr/.gitconfig \
+			-v /nfs/png/home/lab_bldmstr/.git-credentials:/home/lab_bldmstr/.git-credentials \
+		        -v /var/lib/ca-certificates/:/var/lib/ca-certificates/ \
+			-v ${HOST_LTOKEN}:/home/lab_bldmstr/.klocwork/ltoken \
+                        amr-registry.caas.intel.com/esc-devops/gen/lin/zephyr/ubuntu/22.04:20221103_1700"
+
+		DOCKER_RUN_CMD_BUILD="docker run --rm  -e LOCAL_USER=lab_bldmstr -e LOCAL_USER_ID=`id -u` -e LOCAL_GROUP_ID=`id -g` \
+			-e ftp_proxy='http://proxy-dmz.intel.com:911' \
+			-e ZEPHYR_TOOLCHAIN_VARIANT='zephyr' \
+			-e ZEPHYR_SDK_INSTALL_DIR='/opt/zephyr-sdk' \
+			-e KW_URL=${KW_URL} \
+			-v ${WORKSPACE}:${WORKSPACE} \
+			-v ${WORKSPACE}/.ccache:/home/lab_bldmstr/.ccache \
+			-v ${WORKSPACE}/.cache:/home/lab_bldmstr/.cache \
+			-e REQUESTS_CA_BUNDLE='/etc/ssl/certs/ca-certificates.crt' \
+			-v /usr/local/share/ca-certificates/:/usr/local/share/ca-certificates/ -v /etc/ssl/certs/:/etc/ssl/certs/ -v /var/lib/ca-certificates/:/var/lib/ca-certificates/ \
+			-v ${HOST_LTOKEN}:/home/lab_bldmstr/.klocwork/ltoken \
+			-v ${NFS_KW_INSTALLER}:/build/tools:ro \
+                        amr-registry.caas.intel.com/esc-devops/gen/lin/zephyr/ubuntu/22.04:20221103_1700"
+	}
+	options {
+		timestamps()
+		disableConcurrentBuilds()
+		buildDiscarder(logRotator(numToKeepStr: '90', artifactDaysToKeepStr: '30'))
+		skipDefaultCheckout()
+	}
+	parameters {         
+    		booleanParam(name: 'EMAIL', defaultValue: true, description: 'Email notification upon job completion')
+	}
+	stages {
+		stage ('CLEAN') {
+			steps {
+				// Recursively deletes the current directory and its contents.
+				deleteDir() 
+			}
+		}
+		stage('SCM') {
+			steps {
+				checkout([$class: 'GitSCM',
+				userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.henosis.build.automation.services.git']],
+				branches: [[name: "refs/heads/master"]],
+				extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'engservices'],
+				[$class: 'ScmName', name: 'engservices'],
+				[$class: 'CleanBeforeCheckout']]])
+
+				checkout([$class: 'GitSCM',
+				userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/os.rtos.zephyr.iot.zephyr-ia.git']],
+				branches: [[name: "refs/heads/main"]],
+				extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'zephyr-ia'],
+				[$class: 'ScmName', name: 'zephyr-iotg'],
+				[$class: 'CleanBeforeCheckout']]])
+
+				script {
+					getPRID()
+					dir("${WORKSPACE}/engservices/tools/github") {
+						withCredentials([usernamePassword(credentialsId: 'GitHub-Token', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+							sh """
+							python3 getPRdetails_github.py --user ${USERNAME} --token ${PASSWORD} --projName ${ghprbGhRepository} --prID ${PR_ID}
+							"""
+						}
+					}
+					script {
+						if (fileExists('PRdetails.json') ) {
+							archiveArtifacts artifacts: "PRdetails.json"
+						}
+
+						getConfig()
+						if ("${ghprbTargetBranch}" == "intel-pse_dev") {				   
+								sh """${DOCKER_RUN_CMD_FETCH} bash -c "cd ${WORKSPACE} && \
+								export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin &&
+								rm -rf .ccache .cache && \
+								mkdir .ccache && \
+								mkdir .cache && \
+								west init -m https://github.com/intel-innersource/firmware.ec.pse.pse-fw.git --mr pse-fw_dev  && \
+								west update"
+								"""
+						}
+						else if ("${ghprbTargetBranch}" == "pse_base_changes") {
+							sh """${DOCKER_RUN_CMD_FETCH} bash -c "cd ${WORKSPACE} && \
+							export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin &&
+							rm -rf .ccache .cache && \
+							mkdir .ccache && \
+							mkdir .cache && \
+							west init -m https://github.com/intel-innersource/firmware.ec.pse.pse-fw.git --mr main && \
+							west update"
+							"""
+						}
+						else if ("${ghprbTargetBranch}" == "intel-pse_staging") {
+						    sh """
+						    cd ${WORKSPACE} && \
+						    export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin &&
+						    mkdir .ccache && \
+						    mkdir .cache && \
+						    mkdir ehl_pse
+						    """
+
+						    sh """${DOCKER_RUN_CMD_FETCH} bash -c "export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && \
+						    cd ${WORKSPACE}/ehl_pse && \
+						    west init -m https://github.com/intel-innersource/firmware.ec.pse.pse-fw.git --mr pse-fw_staging_test && \
+						    west update"
+						    """
+						}
+					}
+				}
+			}
+		}
+		stage('SCM: zephyr-ia') {	
+			steps {
+				script {
+					getConfig()
+					if ("${ghprbTargetBranch}" == "zephyr_non_upstream_2.7.2") {
+						download_zephyriotg()				   
+
+						sh """
+						  cd ${WORKSPACE} && \
+						  mkdir .ccache && \
+						  mkdir .cache
+						"""
+
+						sh "${DOCKER_RUN_CMD_FETCH} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr-ia && west init --local'"
+						sh "${DOCKER_RUN_CMD_FETCH} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr-ia && west update'"
+					}
+					else if ("${ghprbTargetBranch}" == "rpl_dev") {
+						download_zephyriotg_rpl()				   
+
+						sh """
+						  cd ${WORKSPACE} && \
+						  mkdir .ccache && \
+						  mkdir .cache
+						"""
+
+						sh "${DOCKER_RUN_CMD_FETCH} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr-ia && west init --local'"
+						sh "${DOCKER_RUN_CMD_FETCH} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr-ia && west update'"
+					}
+				}
+			}
+		}
+
+		stage('Addpatch') {
+			steps {
+				script {
+					getConfig()
+					if ("${ghprbTargetBranch}" == "intel-pse_dev") {
+						getPRID()
+						dir("${WORKSPACE}/engservices/tools/github") {
+							withCredentials([usernamePassword(credentialsId: 'GitHub-Token', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+								sh """
+								python addpatchset_github.py --user ${USERNAME} --token ${PASSWORD} --projName ${ghprbGhRepository} --prID ${PR_ID} --cwd ${WORKSPACE} --manifestPATH ${WORKSPACE}/ehl_pse-fw/west.yml
+								"""
+							}
+						}
+					}
+					else if ("${ghprbTargetBranch}" == "pse_base_changes") {
+						getPRID()
+						dir("${WORKSPACE}/engservices/tools/github") {
+							withCredentials([usernamePassword(credentialsId: 'GitHub-Token', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+								sh """
+								python addpatchset_github.py --user ${USERNAME} --token ${PASSWORD} --projName ${ghprbGhRepository} --prID ${PR_ID} --cwd ${WORKSPACE} --manifestPATH ${WORKSPACE}/ehl_pse-fw/west.yml
+								"""
+							}
+						}
+					}
+					else if ("${ghprbTargetBranch}" == "zephyr_non_upstream_2.7.2") {
+						getPRID()
+						dir("${WORKSPACE}/engservices/tools/github") {
+							withCredentials([usernamePassword(credentialsId: 'GitHub-Token', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+								sh """
+								python addpatchset_github.py --user ${USERNAME} --token ${PASSWORD} --projName ${ghprbGhRepository} --prID ${PR_ID} --cwd ${WORKSPACE} --manifestPATH ${WORKSPACE}/zephyr-ia/west.yml
+								"""
+							}
+						}
+					}
+					else if ("${ghprbTargetBranch}" == "rpl_dev") {
+						getPRID()
+						dir("${WORKSPACE}/engservices/tools/github") {
+							withCredentials([usernamePassword(credentialsId: 'GitHub-Token', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+								sh """
+								python addpatchset_github.py --user ${USERNAME} --token ${PASSWORD} --projName ${ghprbGhRepository} --prID ${PR_ID} --cwd ${WORKSPACE} --manifestPATH ${WORKSPACE}/zephyr-ia/west.yml
+								"""
+							}
+						}
+					}
+					else if ("${ghprbTargetBranch}" == "intel-pse_staging") {
+                        			getPRID()
+						dir("${WORKSPACE}/engservices/tools/github") {
+							withCredentials([usernamePassword(credentialsId: 'GitHub-Token', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+								sh """
+								python addpatchset_github.py --user ${USERNAME} --token ${PASSWORD} --projName ${ghprbGhRepository} --prID ${PR_ID} --cwd ${WORKSPACE}/ehl_pse --manifestPATH ${WORKSPACE}/ehl_pse/ehl_pse-fw/west.yml
+								"""
+							}
+						}
+                    			}
+				}
+			}
+		}
+
+		stage('CODING-STYLE') {
+			steps {
+				script {
+					sh """#!/bin/bash -xe
+					ls -d ${WORKSPACE}/patch/PR*/*.patch > filename.txt"""
+					def files = readFile("filename.txt").split( "\\r?\\n" )
+
+							for (int i = 0; i < files.size(); i++) {
+								   def output = files[i]
+
+								  sh """#!/bin/bash -xe 
+								cd ${WORKSPACE}/zephyr/
+								perl ${WORKSPACE}/zephyr/scripts/checkpatch.pl --patch ${output} --summary-file --show-types | tee -a ${WORKSPACE}/coding_style.txt 
+							 """
+						  }
+
+							sh """#!/bin/bash -xe 
+								 cat ${WORKSPACE}/coding_style.txt | cut -d,   -f-2 | grep -e "total: " | cut -d:	-f2 > ${WORKSPACE}/result.txt 
+					 """
+							  archiveArtifacts artifacts: "coding_style.txt"
+							//read the file to get total no of errors and warnings
+				  def output = readFile("${WORKSPACE}/result.txt").trim()
+				  def lines = output.readLines()
+
+				  for (i in lines) {
+					  //no coding style errors reported
+					  if (i.contains("0 errors")) {
+						  if (i.contains("0 warnings")) {
+							  STS_CS = "PASSED"
+						  } else {
+							  STS_CS = "CONDITIONALLY PASSED"
+						  }
+					  }
+					  else {
+						  STS_CS = "FAILED"
+					  }
+					}
+				}
+			}
+		}
+		stage('BUILD') {
+			steps {
+				script {
+					getConfig()
+					if ("${ghprbTargetBranch}" == "pse_base_changes") {
+						sh """${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin &&  \
+						export ZEPHYR_GCC_VARIANT=zephyr && \
+						export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-0.13.1/ && \
+						cd ${WORKSPACE}/zephyr && \
+						source zephyr-env.sh && \
+						cd ${WORKSPACE}/ehl_pse-fw && \
+						./scripts/build_sanity.sh |& tee >( grep -i 'warning:' > warning.log) && \
+						echo "\${PIPESTATUS[\$(( \${#PIPESTATUS[@]} - 2 ))]}" > build_status.log'
+						"""
+
+						if (fileExists("ehl_pse-fw/build_status.log")) {
+						  archiveArtifacts artifacts: "ehl_pse-fw/build_status.log"
+						  build_status = readFile("ehl_pse-fw/build_status.log").trim()
+						  if (build_status.equals("0")) {
+							  STS_BUILD="PASSED"
+							  println "Build Passed."
+						  } 
+						  else {
+							  STS_BUILD="FAILURE"
+							  println "Build Failed."
+							  currentBuild.result = "FAILURE"
+
+						  }
+						}
+						else {
+						  STS_BUILD="FAILURE"
+						  println "File build_status.log not found."
+						  currentBuild.result = "FAILURE"
+
+						}
+					}
+					else if("${ghprbTargetBranch}" == "intel-pse_dev"){
+						sh """${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && \
+						export ZEPHYR_GCC_VARIANT=zephyr && \
+						export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-0.13.1/ && \
+						cd ${WORKSPACE}/zephyr && \
+						source zephyr-env.sh && \
+						cd ${WORKSPACE}/ehl_pse-fw && \
+						./scripts/build_sanity.sh |& tee >( grep -i 'warning:' > warning.log) && \
+						echo "\${PIPESTATUS[\$(( \${#PIPESTATUS[@]} - 2 ))]}" > build_status.log'
+						"""
+
+						if (fileExists("ehl_pse-fw/build_status.log")) {
+						  archiveArtifacts artifacts: "ehl_pse-fw/build_status.log"
+						  build_status = readFile("ehl_pse-fw/build_status.log").trim()
+						  if (build_status.equals("0")) {
+							  STS_BUILD="PASSED"
+							  println "Build Passed."
+						  } 
+						  else {
+							  STS_BUILD="FAILURE"
+							  println "Build Failed."
+							  currentBuild.result = "FAILURE"
+						  }
+						}
+						else {
+						  STS_BUILD="FAILURE"
+						  println "File build_status.log not found."
+						  currentBuild.result = "FAILURE"
+
+						}
+					}
+					else if ("${ghprbTargetBranch}" == "zephyr_non_upstream_2.7.2") {
+						sh """${DOCKER_RUN_CMD_BUILD} bash -c '
+						export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && \
+						export ZEPHYR_GCC_VARIANT=zephyr && \
+						export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-0.13.1/ && \
+						cd ${WORKSPACE}/zephyr && source zephyr-env.sh && west build -p auto -b ehl_crb samples/hello_world \
+						|& tee >( grep -i 'warning:' > warning.log) && \
+						echo "\${PIPESTATUS[\$(( \${#PIPESTATUS[@]} - 2 ))]}" > build_status.log'
+						"""
+						if (fileExists("zephyr/build_status.log")) {
+							archiveArtifacts artifacts: "zephyr/build_status.log"
+							build_status = readFile("zephyr/build_status.log").trim()
+							if (build_status.equals("0")) {
+								STS_BUILD="PASSED"
+								println "Build Passed."
+							} 
+							else {
+								STS_BUILD="FAILURE"
+								println "Build Failed."
+								currentBuild.result = "FAILURE"
+
+							}
+						}		
+						else {
+							STS_BUILD="FAILURE"
+							println "File build_status.log not found."
+							currentBuild.result = "FAILURE"
+						}
+					}
+					else if ("${ghprbTargetBranch}" == "rpl_dev") {
+
+						sh """${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && \
+						export ZEPHYR_GCC_VARIANT=zephyr && \
+						export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-0.13.1/ && \
+						cd ${WORKSPACE}/zephyr && source zephyr-env.sh && west build -p auto -b rpl_crb samples/hello_world \
+						|& tee >( grep -i 'warning:' > warning.log) && \
+						echo "\${PIPESTATUS[\$(( \${#PIPESTATUS[@]} - 2 ))]}" > build_status.log'
+						"""
+						if (fileExists("zephyr/build_status.log")) {
+							archiveArtifacts artifacts: "zephyr/build_status.log"
+							build_status = readFile("zephyr/build_status.log").trim()
+							if (build_status.equals("0")) {
+								STS_BUILD="PASSED"
+								println "Build Passed."
+							} 
+							else {
+								STS_BUILD="FAILURE"
+								println "Build Failed."
+								currentBuild.result = "FAILURE"
+
+							}
+						}		
+						else {
+							STS_BUILD="FAILURE"
+							println "File build_status.log not found."
+							currentBuild.result = "FAILURE"
+						}
+					}
+					else if ("${ghprbTargetBranch}" == "intel-pse_staging") {
+						sh """${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && \
+						export ZEPHYR_GCC_VARIANT=zephyr && \
+						export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-0.13.1/ && \
+						cd ${WORKSPACE}/zephyr && \
+						source zephyr-env.sh && \
+						cd ${WORKSPACE}/ehl_pse-fw && \
+						./scripts/build_sanity.sh |& tee >( grep -i 'warning:' > warning.log) && \
+						echo "\${PIPESTATUS[\$(( \${#PIPESTATUS[@]} - 2 ))]}" > build_status.log'
+						"""
+
+						if (fileExists("ehl_pse-fw/build_status.log")) {
+						  archiveArtifacts artifacts: "ehl_pse-fw/build_status.log"
+						  build_status = readFile("ehl_pse-fw/build_status.log").trim()
+						  if (build_status.equals("0")) {
+							  STS_BUILD="PASSED"
+							  println "Build Passed."
+						  } 
+						  else {
+							  STS_BUILD="FAILURE"
+							  println "Build Failed."
+							  currentBuild.result = "FAILURE"
+
+						  }
+						}
+						else {
+						  STS_BUILD="FAILURE"
+						  println "File build_status.log not found."
+						  currentBuild.result = "FAILURE"
+						}
+					}
+				}
+			}
+		}
+
+		stage('VERDICT') {
+			steps {
+				script {
+					if ("${STS_CS}" == "FAILED" || "${STS_CS}" == "CONDITIONALLY PASSED") {
+						error "There is reported issue on coding style. Please fix the error."
+					}
+				}
+			}
+		}
+		stage('QA: KLOCWORK') {
+			steps {
+				script {
+					getConfig()
+					if ("${ghprbTargetBranch}" == "zephyr_non_upstream_2.7.2") {
+						dir("${WORKSPACE}/engservices/tools/klocwork") {
+							sh """
+							${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr && kwxsync --tag --copy ${KW_URL}/${KW_PROJ} ${KW_URL}/${KW_PROJ_CI}'
+							"""
+						}
+						dir("${WORKSPACE}") {
+							sh """
+							#!/bin/bash -e -x
+							${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr && source zephyr-env.sh && kwinject -w -o ${WORKSPACE}/kwinject.out west build -p auto -b ehl_crb ../zephyr-ia/samples/kw_scan/'
+							"""
+						}
+						dir("${WORKSPACE}/engservices/tools/klocwork") {
+							sh """
+							${DOCKER_RUN_CMD_BUILD} bash -c "export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/engservices/tools/klocwork && python kwbuild.py --project "${KW_PROJ_CI}" --buildspec ${WORKSPACE}/kwinject.out --ignore"
+							"""
+						}
+						dir("${WORKSPACE}/engservices/tools/klocwork") {
+							sh """#!/bin/bash -xe
+							${DOCKER_RUN_CMD_BUILD} bash -c "export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/engservices/tools/klocwork && \
+							python3 -m klocwork_report -u ${KW_URL}/${KW_PROJ_CI} -o ${WORKSPACE}/engservices/tools/klocwork -s --html"
+							"""
+						}
+						script {
+							ISSUES = sh(script:"grep -w 'Total Open Issues' ${WORKSPACE}/engservices/tools/klocwork/kw_report.txt", returnStdout:true).trim()
+							if("${ISSUES}" == "Total Open Issues      : 0") {
+								dir("${WORKSPACE}/engservices/tools/klocwork") {
+								sh """
+								${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE} && kwxsync --tag --copy ${KW_URL}/${KW_PROJ_CI} ${KW_URL}/${KW_PROJ}'
+								"""
+								STS_KW = "PASSED"
+								}
+							} else {
+								error('KLOCWORK FAILED! There are Open KW issues. Please resolve and trigger the CI again.')
+							}
+						}
+					}
+					else if ("${ghprbTargetBranch}" == "rpl_dev") {
+						dir("${WORKSPACE}/engservices/tools/klocwork") {
+							sh """
+							${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr && kwxsync --tag --copy ${KW_URL}/${KW_PROJ} ${KW_URL}/${KW_PROJ_CI}'
+							"""
+						}
+						dir("${WORKSPACE}") {
+							sh """
+							#!/bin/bash -e -x
+							${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/zephyr && source zephyr-env.sh && kwinject -w -o ${WORKSPACE}/kwinject.out west build -p auto -b rpl_crb ../zephyr-ia/samples/kw_scan/'
+							"""
+						}
+						dir("${WORKSPACE}/engservices/tools/klocwork") {
+							sh """
+							${DOCKER_RUN_CMD_BUILD} bash -c "export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/engservices/tools/klocwork && python kwbuild.py --project "${KW_PROJ_CI}" --buildspec ${WORKSPACE}/kwinject.out --ignore"
+							"""
+						}
+						dir("${WORKSPACE}/engservices/tools/klocwork") {
+							sh """#!/bin/bash -xe
+							${DOCKER_RUN_CMD_BUILD} bash -c "export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE}/engservices/tools/klocwork && \
+							python3 -m klocwork_report -u ${KW_URL}/${KW_PROJ_CI} -o ${WORKSPACE}/engservices/tools/klocwork -s --html"
+							"""
+						}
+						script {
+							ISSUES = sh(script:"grep -w 'Total Open Issues' ${WORKSPACE}/engservices/tools/klocwork/kw_report.txt", returnStdout:true).trim()
+							if("${ISSUES}" == "Total Open Issues      : 0") {
+								dir("${WORKSPACE}/engservices/tools/klocwork") {
+								sh """
+								${DOCKER_RUN_CMD_BUILD} bash -c 'export PATH=${PATH}:/build/tools/engsrv/tools/klocwork/latest/bin && cd ${WORKSPACE} && kwxsync --tag --copy ${KW_URL}/${KW_PROJ_CI} ${KW_URL}/${KW_PROJ}'
+								"""
+								STS_KW = "PASSED"
+								}
+							} else {
+								error('KLOCWORK FAILED! There are Open KW issues. Please resolve and trigger the CI again.')
+							}
+						}
+					}
+				}
+			}
+		}
+		stage('QA:KLOCWORK: PSE') {
+			steps {
+				script {
+					getConfig()
+					if ("${ghprbTargetBranch}" == "intel-pse_dev") {
+						download_kwc()
+					}
+					else if ("${ghprbTargetBranch}" == "pse_base_changes") {
+						download_kwc()
+					}
+					else if ("${ghprbTargetBranch}" == "intel-pse_staging") {
+						download_kwc()
+					}
+				}
+			}
+		}
+	}
+	post {
+		always {
+			script {
+				// To trigger Log Parser build to push Build log to Splunk Server.
+				build job: 'iotgdevops01/ADM-LOG_PARSER',
+				parameters: [ stringParam(name: 'JOB_RESULT', value: "${currentBuild.result}"),
+				stringParam(name: 'BUILD_URL', value: "${env.BUILD_URL}"), booleanParam(name: 'SPLUNK', value: true)
+				], wait: false, propagate: false
+			}
+		}
+		success {
+			script {
+				if (env.ghprbPullId) {
+					COMMENT_URL = "${PRCommentUrl}"
+				} else {
+					COMMENT_URL = "${CommentUrl}"
+				}
+			}
+			sh "curl -s -H \"Authorization: token ${API_ID}\" -X POST -d '{\"body\": \"Jenkins CI Status: PASSED & Jenkins log: ${BUILD_URL}console & Verification Build  :  PASSED\"}' -H \"Content-Type: application/json\" \"${COMMENT_URL}\""
+			emailext body: '${SCRIPT, template="managed:pipeline.html"}', subject: '$DEFAULT_SUBJECT', replyTo: '$DEFAULT_REPLYTO', to: '$DEFAULT_RECIPIENTS,' + "francisx.j.vijay@intel.com, anwaruddinx.ansari@intel.com, anandx.babu.rajendran@intel.com"
+		}
+		failure {  
+			script {
+				if (env.ghprbPullId) {
+					COMMENT_URL = "${PRCommentUrl}"
+				} else {
+					COMMENT_URL = "${CommentUrl}"
+				}
+			}
+			sh "curl -s -H \"Authorization: token ${API_ID}\" -X POST -d '{\"body\": \"Jenkins CI Status: FAILED & Jenkins log: ${BUILD_URL}console & Verification Build  :  FAILED\"}' -H \"Content-Type: application/json\" \"${COMMENT_URL}\""
+			emailext body: '${SCRIPT, template="managed:pipeline.html"}', subject: '$DEFAULT_SUBJECT', replyTo: '$DEFAULT_REPLYTO', to: '$DEFAULT_RECIPIENTS,' + "francisx.j.vijay@intel.com, anwaruddinx.ansari@intel.com, anandx.babu.rajendran@intel.com"
+		}
+		aborted {
+			script {
+				if (env.ghprbPullId) {
+					COMMENT_URL = "${PRCommentUrl}"
+				} else {
+					COMMENT_URL = "${CommentUrl}"
+				}
+			}
+			sh "curl -s -H \"Authorization: token ${API_ID}\" -X POST -d '{\"body\": \"Jenkins CI Status: ABORTED & Jenkins log: ${BUILD_URL}console & Verification Build  :  ABORTED\"}' -H \"Content-Type: application/json\" \"${COMMENT_URL}\""
+			emailext body: '${SCRIPT, template="managed:pipeline.html"}', subject: '$DEFAULT_SUBJECT', replyTo: '$DEFAULT_REPLYTO', to: '$DEFAULT_RECIPIENTS,' + "francisx.j.vijay@intel.com, anwaruddinx.ansari@intel.com, anandx.babu.rajendran@intel.com"
+		}
+	}
+}

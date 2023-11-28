@@ -565,7 +565,7 @@ pipeline {
                                 cov-configure --clang
                                 cov-configure --vb
                                 cov-build --dir ${WORKSPACE}/init_dir/ west build -p auto -b intel_adl_crb ${WORKSPACE}/zephyr/samples/kw_scan/  
-                                cov-analyze --dir ${WORKSPACE}/init_dir/ --concurrency --security --rule --enable-constraint-fpp --enable-fnptr --enable-virtual
+                                cov-analyze --dir ${WORKSPACE}/init_dir/ --concurrency --security --rule --enable-constraint-fpp --enable-fnptr --enable-virtual ${WORKSPACE}/zephyr/samples/kw_scan/
                                 cov-manage-emit --dir ${WORKSPACE}/init_dir/ list
                                 cov-commit-defects --user ${BDUSR} --password ${BDPWD} --dir ${WORKSPACE}/init_dir/ --url https://coverityent.devtools.intel.com/prod8 --stream GEN-LIN-ZEPHYR.IOT-ZEPHYR-CI
                                 cov-generate-cvss-report ${WORKSPACE}/covreport.yml --output ${WORKSPACE}/GEN-LIN-ZEPHYR.IOT-ZEPHYR-CI-cvss.pdf --report --password env:LAB_PASS

@@ -1,0 +1,18 @@
+---
+
+daily:
+    branch:
+        dev/intel-mainline-tracking-6.5-rt5/master:
+            ASL:
+                config_file: "http://oak-07.jf.intel.com/ikt_kernel_deb_repo/pool/main/l/linux-6.4-rt6-mainline-tracking-rt-230816t044845z/kernel.config"
+                release_git_url: "https://github.com/intel-innersource/os.linux.kernel.mainline-tracking-staging.git"
+                release_rt_branch: "mainline-tracking-rt/v6.5-rt5"
+                gio_cmd: 
+                    Mon: "-profile 144"
+                    Tue: "-profile 144"
+                    Wed: "-profile 144"
+                    Thu: "-profile 144"
+                    Fri: "-profile 144"
+                    Sat: "-profile 144"
+                    Sun: "-profile 144"
+                email: yong.liang.choong@intel.com

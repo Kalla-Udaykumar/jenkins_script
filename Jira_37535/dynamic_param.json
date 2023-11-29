@@ -1,0 +1,10 @@
+{
+  "dynamic_parameters":{
+    "gio_kernel_url": "image_path",
+    "gio_kernel_version": "image_version"
+  },
+  "additional_parameters": {
+    "gio_kernel_url": "image_path",
+    "gio_kernel_version": "image_version"
+  }
+}

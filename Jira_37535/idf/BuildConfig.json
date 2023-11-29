@@ -1,0 +1,21 @@
+{
+    "IngredientName": "GEN-LIN-TSN",
+    "Description": "IDF ABI Project Config File for TSN LIN Ingredient",
+    "OutputConfiguration": "idf/PackageGen.json",
+    "OutputRoot": "OWRBin",
+    "OutputDir": "OWRBuild",
+    "PackageRoot": "OWRPackage",
+    "PackageMetadataTemplate": "idf/PackageMetadataTemplate.json",
+    "SubComponents": [
+        {
+            "Name": "build",
+            "Description": "TSN-LIN SCM and BUILD",
+            "ProjectFile": "./build.sh",
+            "ProjectType": "Script",
+            "WorkingDirectory": "idf",
+            "AdditionalFlags": "",
+            "AdditionalEnvVars": ""
+        }
+    ],
+    "SchemaVersion": "1.0"
+}

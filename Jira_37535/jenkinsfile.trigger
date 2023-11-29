@@ -152,8 +152,8 @@ pipeline {
 			script {
 			
 				checkout([$class: 'GitSCM',
-				userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.jenkins.cac.git']],
-				branches: [[name: "${CONFIG_BRANCH}"]],
+				userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/Kalla-Udaykumar/jenkins_script.git']],
+				branches: [[name: "master"]],
 				extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/henosis'],
 				[$class: 'ScmName', name: 'henosis'],
 				[$class: 'CloneOption', timeout: 60],
@@ -178,7 +178,7 @@ pipeline {
             steps {
                 script {
 		
-			props = readYaml file: 'abi/henosis/cac/gen/lin/tsn/kernel/daily/config.yml'
+			props = readYaml file: 'abi/henosis/Jira_37535/config.yml'
 			platform_list = props.daily.branch."${env.BRANCH_NAME}".keySet()
 			parallelBuilds = [:]
 
@@ -212,7 +212,7 @@ pipeline {
 
 // Get information from config.yml file
 def getConfig(PLATFORM) {
-        props = readYaml file: 'abi/henosis/cac/gen/lin/tsn/kernel/daily/config.yml'
+        props = readYaml file: 'abi/henosis/Jira_37535/config.yml'
         print(props)
         //OneBKC variable
         env.OneBKC_url = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".OneBKC_url}"

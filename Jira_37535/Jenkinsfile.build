@@ -132,8 +132,8 @@ pipeline {
                 stage("Henosis-Repo") {
                     steps {
                     checkout([$class: 'GitSCM',
-                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.jenkins.cac.git']],
-                    branches: [[name: "${CONFIG_BRANCH}"]],
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/Kalla-Udaykumar/jenkins_script.git']],
+                    branches: [[name: "master"]],
                     extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/henosis'],
                     [$class: 'ScmName', name: 'henosis'],
                     [$class: 'CloneOption', timeout: 60],
@@ -253,7 +253,7 @@ pipeline {
         stage('ABI') {
             steps {
                script {
-                    abi.shell("cp -r ${WORKSPACE}/abi/henosis/cac/gen/lin/tsn/kernel/daily/idf ${WORKSPACE}/abi")
+                    abi.shell("cp -r ${WORKSPACE}/abi/henosis/Jira_37535/idf ${WORKSPACE}/abi")
                     PrepareWS()
                 }
             }

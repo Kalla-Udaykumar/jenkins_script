@@ -1,4 +1,4 @@
-set -e
+set -x
 # Set up paths to dev, RT, and LTS directories.
 mkdir ${WORKSPACE}/abi/dev_path
 mkdir ${WORKSPACE}/abi/lts_path

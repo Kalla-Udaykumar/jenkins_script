@@ -107,24 +107,13 @@ pipeline {
         booleanParam(name: 'EMAIL', defaultValue: true, description: 'Email notification upon job completion')
         booleanParam(name: 'PUBLISH', defaultValue: true, description: 'Artifacts deployment')
         string(name: 'CONFIG_BRANCH', defaultValue: 'master', description: 'Branch for config file')
-	string(name: 'BRANCH_NAME', defaultValue: 'master', description: 'Branch for config file')
-	string(name: 'PLATFORM', defaultValue: 'master', description: 'Branch for config file')
-	string(name: 'OneBKC_url', defaultValue: '', description: 'Branch for config file')
-	string(name: 'OneBKC_branch', defaultValue: '', description: 'Branch for config file')
-	string(name: 'OneBKC_file', defaultValue: '', description: 'Branch for config file')
-	string(name: 'OneBKC_ifwi', defaultValue: '', description: 'Branch for config file')
-	string(name: 'release_git_url', defaultValue: '', description: 'Branch for config file')
-	string(name: 'release_rt_branch', defaultValue: '', description: 'Branch for config file')
-	string(name: 'release_lts_branch', defaultValue: '', description: 'Branch for config file')
-	string(name: 'kernel_rt', defaultValue: '', description: 'Branch for config file')
-	string(name: 'kernel_lts', defaultValue: '', description: 'Branch for config file')
-	string(name: 'kernelsrc_lts_tar', defaultValue: '', description: 'Branch for config file')
-	string(name: 'kernelsrc_lts_cfg', defaultValue: '', description: 'Branch for config file')
-	string(name: 'kernelsrc_rt_tar', defaultValue: '', description: 'Branch for config file')
-	string(name: 'kernelsrc_rt_cfg', defaultValue: '', description: 'Branch for config file')
-	string(name: 'mender_file', defaultValue: '', description: 'Branch for config file')
-	string(name: 'email', defaultValue: '', description: 'Branch for config file')
-	string(name: 'gio_cmd', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'BRANCH_NAME', defaultValue: 'master', description: 'Branch for config file')
+	    string(name: 'PLATFORM', defaultValue: 'master', description: 'Branch for config file')
+	    string(name: 'config_file', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'release_git_url', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'release_rt_branch', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'email', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'gio_cmd', defaultValue: '', description: 'Branch for config file')
     }
     stages {
         stage('SCM:DevOps') {
@@ -161,7 +150,7 @@ pipeline {
         }
         stage('SCM') {
             parallel {
-                stage("One-BKC Repo") {
+                /*stage("One-BKC Repo") {
                     steps {
                     checkout([$class: 'GitSCM',
                     userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: "${OneBKC_url}"]],
@@ -186,7 +175,7 @@ pipeline {
                     [$class: 'CleanBeforeCheckout'],
                     [$class: 'CheckoutOption', timeout: 60]]])
                     }
-                }
+                }*/
                 stage("RT Repo") {
                     steps {
                     checkout([$class: 'GitSCM',
@@ -199,7 +188,7 @@ pipeline {
                     [$class: 'CheckoutOption', timeout: 60]]])
                     }
                 }
-                stage("LTS Repo") {
+                /*stage("LTS Repo") {
                     steps {
                     checkout([$class: 'GitSCM',
                     userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: "${release_git_url}"]],
@@ -210,7 +199,7 @@ pipeline {
                     [$class: 'CleanBeforeCheckout'],
                     [$class: 'CheckoutOption', timeout: 60]]])
                     }
-                }
+                }*/
             }
         }
         stage ('Download image from Artifactory') {
@@ -225,24 +214,6 @@ pipeline {
                                       "target": "abi/rt_path/",
                                       "flat": "true",
                                       "recursive": "true"
-                                },
-                                {
-                                      "pattern": "${IMAGE_PATH}${kernelsrc_lts_cfg}",
-                                      "target": "abi/lts_path/",
-                                      "flat": "true",
-                                      "recursive": "true"
-                                },
-                                {
-                                    "pattern": "${IMAGE_PATH}${mender_file}",
-                                    "target": "abi/rt_path/",
-                                    "flat": "true",
-                                    "recursive": "true"
-                                },
-                                {
-                                    "pattern": "${IMAGE_PATH}${mender_file}",
-                                    "target": "abi/lts_path/",
-                                    "flat": "true",
-                                    "recursive": "true"
                                 }
                             ]
                         }"""
@@ -302,7 +273,7 @@ pipeline {
 			
                     def GIO_IMG_URL = "https://${ARTIFACTORY_SERVER}/artifactory/${ARTIFACTORY_REPO}/${BUILD_YEAR}/${upload_folder}/${PLATFORM}/${params.BRANCH_NAME.replace('/','_')}/${env.DATETIME}/"
                     
-                    String dynamicParam = readFile("${WORKSPACE}/abi/henosis/cac/gen/lin/tsn/kernel/daily/dynamic_param.json").replaceAll('image_path',"${GIO_IMG_URL}").replaceAll('image_version',"${env.DATETIME}")
+                    String dynamicParam = readFile("${WORKSPACE}/abi/henosis/Jira_37535/dynamic_param.json").replaceAll('image_path',"${GIO_IMG_URL}").replaceAll('image_version',"${env.DATETIME}")
                     writeFile file:"${WORKSPACE}/gio_validation/dynamic_param.json", text: dynamicParam
                     def dynamicParam_json = readJSON file: "${WORKSPACE}/gio_validation/dynamic_param.json"
                     println dynamicParam_json

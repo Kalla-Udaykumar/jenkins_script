@@ -84,25 +84,14 @@ def buildJob( BRANCH_NAME, PLATFORM ){
         getConfig(PLATFORM)
 
         println ("Trigger TSN AUTOMATION - ${env.BRANCH_NAME} - ${PLATFORM}")
-        build ( job: "iotgdevops01/GEN-LIN-TSN.KERNEL-BD-DLY-BUILD", 
+        build ( job: "iotgdevops01/NON_PROD/UKALLA/GEN-LIN-TSN.KERNEL.UBUNTU-BD-DLY-BUILD", 
         parameters: [
 		string(name: 'PLATFORM', value: "${PLATFORM}"),
 		string(name: 'BRANCH_NAME', value: "${env.BRANCH_NAME}"),
 		string(name: 'CONFIG_BRANCH', value: "${CONFIG_BRANCH}"),
-		string(name: 'OneBKC_url', value: "${OneBKC_url}"),
-		string(name: 'OneBKC_branch', value: "${OneBKC_branch}"),
-		string(name: 'OneBKC_file', value:"${OneBKC_file}"),
-		string(name: 'OneBKC_ifwi', value:"${OneBKC_ifwi}"),
+		string(name: 'config_file', value:"${config_file}"),
 		string(name: 'release_git_url', value:"${release_git_url}"),
 		string(name: 'release_rt_branch', value:"${release_rt_branch}"),
-		string(name: 'release_lts_branch', value:"${release_lts_branch}"),
-		string(name: 'kernel_rt', value:"${kernel_rt}"),
-		string(name: 'kernel_lts', value:"${kernel_lts}"),
-		string(name: 'kernelsrc_lts_tar', value:"${kernelsrc_lts_tar}"),
-		string(name: 'kernelsrc_lts_cfg', value:"${kernelsrc_lts_cfg}"),
-		string(name: 'kernelsrc_rt_tar', value:"${kernelsrc_rt_tar}"),
-		string(name: 'kernelsrc_rt_cfg', value:"${kernelsrc_rt_cfg}"),
-		string(name: 'mender_file', value:"${mender_file}"),
 		string(name: 'email', value:"${email}"),
 		string(name: 'gio_cmd', value:"${gio_cmd}"),
 		
@@ -160,7 +149,7 @@ pipeline {
 				[$class: 'CleanBeforeCheckout'],
 				[$class: 'CheckoutOption', timeout: 60]]])
 			    
-				props = readYaml file: 'abi/henosis/cac/gen/lin/tsn/kernel/daily/config.yml'
+				props = readYaml file: 'abi/henosis/Jira_37535/config.yml'
 				println("${props.daily.branch.keySet()}")
 				if (env.BRANCH_NAME in props.daily.branch.keySet()) {
 				    println("Build continue")
@@ -215,36 +204,14 @@ def getConfig(PLATFORM) {
         props = readYaml file: 'abi/henosis/Jira_37535/config.yml'
         print(props)
         //OneBKC variable
-        env.OneBKC_url = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".OneBKC_url}"
-        env.OneBKC_branch = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".OneBKC_branch}"
-        env.OneBKC_file = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".OneBKC_file}"
-        env.OneBKC_ifwi = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".OneBKC_ifwi}"
+        env.config_file = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".config_file}"
         env.release_git_url = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".release_git_url}"
         env.release_rt_branch = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".release_rt_branch}"
-        env.release_lts_branch = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".release_lts_branch}"
-        env.kernel_rt = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".kernel_rt}"
-        env.kernel_lts = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".kernel_lts}"
-        env.kernelsrc_lts_tar = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".kernelsrc_lts_tar}"
-        env.kernelsrc_lts_cfg = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}". kernelsrc_lts_cfg}"
-        env.kernelsrc_rt_tar = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".kernelsrc_rt_tar}"
-        env.kernelsrc_rt_cfg = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".kernelsrc_rt_cfg}"
-        env.mender_file = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".mender_file}"
 	email = "${props.daily.branch."${env.BRANCH_NAME}"."${PLATFORM}".email}"
 
-        println("${env.OneBKC_url}")
-        println("${env.OneBKC_branch}")
-        println("${env.OneBKC_file}")
-        println("${env.OneBKC_ifwi}")
+        println("${env.config_file}")
         println("${env.release_git_url}")
         println("${env.release_rt_branch}")
-        println("${env.release_lts_branch}")
-        println("${env.kernel_rt}")
-        println("${env.kernel_lts}")
-        println("${env.kernelsrc_lts_tar}")
-        println("${env.kernelsrc_lts_cfg}")
-        println("${env.kernelsrc_rt_tar}")
-        println("${env.kernelsrc_rt_cfg}")
-        println("${env.mender_file}")
 
         switch("${DAY}") {
             case "1":

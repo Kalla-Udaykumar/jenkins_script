@@ -1,0 +1,135 @@
+#!groovy 
+def artifacts_dir() {
+    dir("${WORKSPACE}") {
+        sh """#!/bin/bash -xe
+        mkdir binaries
+        mkdir reports
+        """
+    }
+}
+pipeline{
+    agent {
+        node {
+            label 'ESC-DOCKER-UB16'
+        }
+    }
+    environment {
+        BINARIES_DIR = "${WORKSPACE}/binaries"
+        REPORTS_DIR = "${WORKSPACE}/reports"
+        BDBA_ZIP_NAME="${env.JOB_BASE_NAME}-${env.BUILD_NUMBER}.zip"
+        BDBA_SCAN_DIR = "BDBA_SCAN"
+        
+    }
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '90', artifactDaysToKeepStr: '30'))
+        skipDefaultCheckout()
+    }
+    parameters {
+        booleanParam(name: 'CLEAN', defaultValue: true, description: 'Clean workspace')
+        booleanParam(name: 'EMAIL', defaultValue: true, description: 'Email notification upon job completion')
+	booleanParam(name: 'DEBPACKAGE', defaultValue: true, description: 'Exclude debug and source packages from scan.')
+        string(name: 'ART_PATH', defaultValue: 'hspe-edge-repos-png-local-png-local/ubuntu-ppa2/', description: 'PPA path jfrog pattern to scan')
+    }
+    stages {
+        stage ('CLEAN') {
+            when {
+                expression { params.CLEAN == true }
+            }
+            steps {
+                deleteDir()
+            }
+        }
+        stage('SCM') {
+            steps {
+                checkout changelog: false, scm: ([$class: 'GitSCM',
+                userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.henosis.build.automation.services.git']],
+                branches: [[name: 'refs/heads/master']],
+                extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'esc-engservices'],
+                [$class: 'CleanBeforeCheckout']]])
+            }
+        }
+        stage ('Download Binaries') {
+            steps  {
+                artifacts_dir()
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'BuildAutomation', passwordVariable: 'BDPWD', usernameVariable: 'BDUSR')]) {
+                        echo "Download Files from Artifactory"
+                        def artServer = Artifactory.server 'af01p-png.devtools.intel.com'
+                        def artFiles  = """ {
+                        "files": [
+                                {
+                                    "pattern": "${params.ART_PATH}",
+                                    "target": "${WORKSPACE}/binaries/",
+                                    "flat": "false",
+                                    "recursive": "true"
+                                }
+                            ]
+                        }"""
+                        artServer.download spec: artFiles
+                    }
+                }
+            }
+        }
+        
+        stage('BDBA Scan') {
+            steps {
+                dir("${BINARIES_DIR}/${BDBA_SCAN_DIR}") {
+                    deleteDir()
+                }
+                script {
+			if (params.DEBPACKAGE == true) {
+				sh """#!/bin/bash -xe
+					find \${BINARIES_DIR} -name 'linux-image-*-dbg*.deb' -o -name 'linux-image-*-intel-dbg*.deb' -o -name '*.ddeb' -o -name '*.tar.*' -o -name '*.diff*' | xargs rm -rf
+				"""
+			}
+		}
+		dir("${BINARIES_DIR}") {
+                    zip(zipFile: "${BDBA_SCAN_DIR}/${BDBA_ZIP_NAME}")
+                }
+                dir("${BINARIES_DIR}") {
+                    withCredentials([usernamePassword(credentialsId: 'BuildAutomation', passwordVariable: 'BDPWD', usernameVariable: 'BDUSR')]) {
+                        sh """#!/bin/bash -xe
+                        python ${WORKSPACE}/esc-engservices/tools/bdba/bdbascan.py -u ${BDUSR} -p ${BDPWD} -so ${BINARIES_DIR}/${BDBA_SCAN_DIR}/${BDBA_ZIP_NAME}  -o ${REPORTS_DIR} -v -t 2000"""
+                    }
+                }
+            }
+        }
+        stage("PUBLISH"){
+            steps{
+                dir("${WORKSPACE}/reports"){
+                    script {
+                        def artServer = Artifactory.server 'af01p-png.devtools.intel.com'
+                        def artFiles  = """{
+                            "files": [
+                                {
+                                    "pattern": "*",
+                                    "target": "hspe-edge-repos-png-local-png-local/scan-report/${BUILD_NUMBER}/",
+                                    "props": "retention.days=365",
+                                    "flat" : "false"
+                                }
+                            ]
+                        }"""
+                        artServer.upload spec: artFiles
+                    }
+                }
+            }
+        }
+    }
+    /*post {
+        always {
+            script {
+                // To trigger Log Parser build to push Build log to Splunk Server.
+                build job: 'iotgdevops01/ADM-LOG_PARSER',
+                parameters: [ stringParam(name: 'JOB_RESULT', value: "${currentBuild.result}"),
+                stringParam(name: 'BUILD_URL', value: "${env.BUILD_URL}"), booleanParam(name: 'SPLUNK', value: true)
+                ], wait: false, propagate: false
+                
+                if (params.EMAIL == true) {
+                    emailext body: '${SCRIPT, template="managed:pipeline.html"}', subject: '$DEFAULT_SUBJECT', replyTo: '$DEFAULT_REPLYTO', to: '$DEFAULT_RECIPIENTS, jonathan.yong@intel.com' 
+                }
+            }
+        }
+    }*/
+}

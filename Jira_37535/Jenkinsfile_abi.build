@@ -1,0 +1,356 @@
+#!groovy
+@Library('abi@2.6.0') _
+
+import owm.common.BuildInfo
+Map buildinfo = BuildInfo.instance.data
+
+linuxcloudName = 'gar-png-nswe-sws-ada'
+
+def podDefinitionYaml = """
+kind: Pod
+apiVersion: v1
+spec:
+  volumes:
+    - name: nfs
+      persistentVolumeClaim:
+        claimName: png-nfs
+    - name: github-config
+      secret:
+        secretName: gitconfig
+    - name: sshkeys
+      secret:
+        secretName: ssh-keys
+    - name: netrc-lab
+      secret:
+        secretName: netrc
+  nodeSelector:
+    platform: ESC
+  containers:
+  - name: jnlp
+    image: amr-registry.caas.intel.com/owr/iotg/labbldmstr_iotg_jnlp_lnx:latest
+    env:
+      - name: KUB_NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+    tty: true
+    imagePullPolicy: Always
+    securityContext:
+      runAsUser: 44051
+  - name: build-environment1
+    image: amr-registry.caas.intel.com/esc-devops/dev/rtoh/abi/ub20/tsn:test
+    resources:
+      requests:
+        cpu: "8.0"
+        memory: "16Gi"
+      limits:
+        cpu: "9.0"
+        memory: "18Gi"
+    env:
+      - name: KUB_NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+    tty: true
+    imagePullPolicy: Always
+    securityContext:
+      runAsUser: 44051
+    command:
+    - /bin/bash
+    args:
+    - -c
+    - sleep 36000
+    volumeMounts:
+    - name: nfs
+      mountPath: "/build/tools"
+    - mountPath: "/home/lab_bldmstr/.gitconfig"
+      name: github-config
+      subPath: ".gitconfig"
+    - mountPath: "/home/lab_bldmstr/.ssh/"
+      name: sshkeys
+    - name: netrc-lab
+      mountPath: "/home/lab_bldmstr/.netrc"
+      subPath: ".netrc"
+"""
+
+def print_node_name() {
+    println("POD running on === ${KUB_NODE_NAME} === worker machine")
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud linuxcloudName
+            defaultContainer 'build-environment1'
+            label "linux-builds-${env.JOB_BASE_NAME}-${UUID.randomUUID().toString()}"
+            slaveConnectTimeout '600000'
+            yaml podDefinitionYaml
+            }
+    }
+    environment {
+        DAY = new Date().format("u")
+        DATETIME = new Date().format("yyyyMMdd-HHmm")
+        BUILD_YEAR = new Date().format("yyyy")
+        BuildVersion = "1.0.000"
+        ABI_CONTAINER = "TRUE"
+        ARTIFACTORY_SERVER = "af01p-png.devtools.intel.com"
+        ARTIFACTORY_REPO = "hspe-tsn_automation-png-local/ehl/lin"
+        upload_folder = "daily"
+        DOCKER_IMG = "amr-registry.caas.intel.com/esc-apps/gio/ubuntu18.04:20210927_1110"
+    }
+    options {
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '90', artifactDaysToKeepStr: '30'))
+        skipDefaultCheckout()
+    }
+    parameters {
+        booleanParam(name: 'EMAIL', defaultValue: true, description: 'Email notification upon job completion')
+        booleanParam(name: 'PUBLISH', defaultValue: true, description: 'Artifacts deployment')
+        string(name: 'CONFIG_BRANCH', defaultValue: 'master', description: 'Branch for config file')
+	    string(name: 'BRANCH_NAME', defaultValue: 'master', description: 'Branch for config file')
+	    string(name: 'PLATFORM', defaultValue: 'master', description: 'Branch for config file')
+	    string(name: 'config_file', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'release_git_url', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'release_rt_branch', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'email', defaultValue: '', description: 'Branch for config file')
+	    string(name: 'gio_cmd', defaultValue: '', description: 'Branch for config file')
+    }
+    stages {
+        stage('SCM:DevOps') {
+            parallel {
+                stage("Henosis-Repo") {
+                    steps {
+                    checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/Kalla-Udaykumar/jenkins_script.git']],
+                    branches: [[name: "master"]],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/henosis'],
+                    [$class: 'ScmName', name: 'henosis'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+			script {
+				currentBuild.description = "${BRANCH_NAME}-${PLATFORM}"
+			}
+                    
+                    }
+                }
+                stage("Build Automation Repo") {
+                    steps {
+                    checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: "https://github.com/intel-innersource/libraries.devops.henosis.build.automation.services.git"]],
+                    branches: [[name: "master"]],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/automation'],
+                    [$class: 'ScmName', name: 'eng-services'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+                    }
+                }
+            }
+        }
+        stage('SCM') {
+            parallel {
+                /*stage("One-BKC Repo") {
+                    steps {
+                    checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: "${OneBKC_url}"]],
+                    branches: [[name: "${OneBKC_branch}"]],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/os.linux.cicd.linux-bkc-bom'],
+                    [$class: 'ScmName', name: 'onebkc'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+
+                    getBKC()
+                    }
+                }*/
+                stage("Dev Repo") {
+                    steps {
+                    checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/drivers.ethernet.time-sensitive-networking.ese-linux-net-next.git']],
+                    branches: [[name: "dev/intel-mainline-tracking-6.5-rt5/master"]],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/dev_path'],
+                    [$class: 'ScmName', name: 'henosis'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+                    }
+                }
+                stage("RT Repo") {
+                    steps {
+                    checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: "https://github.com/intel-innersource/os.linux.kernel.mainline-tracking-staging.git"]],
+                    branches: [[name: "mainline-tracking-rt/v6.5-rt5"]],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/rt_path'],
+                    [$class: 'ScmName', name: 'henosis'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+                    }
+                }
+                /*stage("LTS Repo") {
+                    steps {
+                    checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: "${release_git_url}"]],
+                    branches: [[name: "${release_lts_branch}"]],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/lts_path'],
+                    [$class: 'ScmName', name: 'henosis'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+                    }
+                }*/
+            }
+        }
+        /*stage ('Download image from Artifactory') {
+            steps {
+                script {
+                    getBKC()
+                        def artServer = Artifactory.server "${IMAGE_ARTIFACTORY}"
+                        def artFiles  = """ {
+                            "files": [
+                                {
+                                      "pattern": "${IMAGE_PATH}${kernelsrc_rt_cfg}",
+                                      "target": "abi/rt_path/",
+                                      "flat": "true",
+                                      "recursive": "true"
+                                }
+                            ]
+                        }"""
+                        artServer.download spec: artFiles, failNoOp: true
+                }
+            }
+        }*/
+        stage('ABI') {
+            steps {
+               script {
+                    abi.shell("cp -r ${WORKSPACE}/abi/henosis/Jira_37535/idf ${WORKSPACE}/abi")
+                    PrepareWS()
+                }
+            }
+        }
+            stage('BUILD') {
+            steps {
+                script {
+                    BuildInfo.instance.data["Version"] = env.BuildVersion
+                    PrepareWS()
+                    //getBKC()
+                    sleep 360
+                    abi_build subComponentName: "build"
+                }
+            }
+        }
+        stage('PUBLISH') {
+            steps {
+                script {
+                    dir("${WORKSPACE}/abi/upload/") {
+                        def buildInfo = Artifactory.newBuildInfo()
+                        def artServer = Artifactory.server "${ARTIFACTORY_SERVER}"
+                        def kwrpt  = """{
+                            "files": [
+                                {
+                                    "pattern": "*",
+                                    "target": "${ARTIFACTORY_REPO}/${BUILD_YEAR}/${upload_folder}/${PLATFORM}/${params.BRANCH_NAME.replace('/','_')}/${env.DATETIME}/",
+                                    "props": "retention.days=30",
+                                    "flat" : "false"
+                                }
+                            ]
+                        }"""
+                        artServer.upload spec: kwrpt, buildInfo: buildInfo
+                        artServer.publishBuildInfo buildInfo
+                    }
+                }
+            }
+        }
+        stage ('GIO') {
+            steps {
+                script {
+
+                    sh """ #!/bin/bash -xe
+                        if [ ! -d gio_validation ]; then
+                            mkdir gio_validation
+                        fi
+                    """
+			
+                    def GIO_IMG_URL = "https://${ARTIFACTORY_SERVER}/artifactory/${ARTIFACTORY_REPO}/${BUILD_YEAR}/${upload_folder}/${PLATFORM}/${params.BRANCH_NAME.replace('/','_')}/${env.DATETIME}/"
+                    
+                    String dynamicParam = readFile("${WORKSPACE}/abi/henosis/Jira_37535/dynamic_param.json").replaceAll('image_path',"${GIO_IMG_URL}").replaceAll('image_version',"${env.DATETIME}")
+                    writeFile file:"${WORKSPACE}/gio_validation/dynamic_param.json", text: dynamicParam
+                    def dynamicParam_json = readJSON file: "${WORKSPACE}/gio_validation/dynamic_param.json"
+                    println dynamicParam_json
+
+                    sh """ #!/bin/bash -xe
+                        cd ${WORKSPACE}/gio_validation && gio_plugin ${gio_cmd} -jsonfile dynamic_param.json
+                    """
+		// Gather GIO result
+                sh """#!/bin/bash -xe
+                chmod +x ${WORKSPACE}/abi/automation/tools/gio/combine_gio_output.sh
+                ${WORKSPACE}/abi/automation/tools/gio/combine_gio_output.sh
+                cat gio_result.txt
+                """
+                archiveArtifacts artifacts: "gio_result.txt"
+                }
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                // To trigger Log Parser build to push Build log to Splunk Server.
+                build job: 'iotgdevops01/ADM-LOG_PARSER',
+                parameters: [ stringParam(name: 'JOB_RESULT', value: "${currentBuild.result}"),
+                stringParam(name: 'BUILD_URL', value: "${env.BUILD_URL}"), booleanParam(name: 'SPLUNK', value: true)
+                ], wait: false, propagate: false
+                
+                // Trigger email
+                if (params.EMAIL == true) {
+                    emailext body: '${SCRIPT, template="managed:pipeline.html"}', subject: '$DEFAULT_SUBJECT', replyTo: '$DEFAULT_REPLYTO', to: '$DEFAULT_RECIPIENTS, iotg.ped.sw.ese.ethernet-tsn@intel.com' 
+                }
+
+
+            }
+        }
+    }
+}
+
+//Get information from OneBKC_file
+def getBKC() {
+    props = readJSON file: "abi/${OneBKC_file}"
+
+    IMAGE_URL = "${props.software_configuration.os_artifacts_folder_link}"
+    IMAGE_PATH = ("${IMAGE_URL}").replaceAll('https://ubit-artifactory-ba.intel.com/artifactory/',"").replaceAll('https://af01p-png.devtools.intel.com/artifactory/',"")
+    IMAGE_ARTIFACTORY = ("${IMAGE_URL}").split("/")[2]
+
+}
+
+
+// Prepare the workspace for the ingredient
+void PrepareWS(String BuildConfig="idf/BuildConfig.json") {
+    log.Debug("Enter")
+
+    log.Info("This build is running on Node:${env.NODE_NAME} WorkSpace: ${env.WORKSPACE}")
+
+    abi_setup_proxy()
+    
+    abi_init config: BuildConfig, ingPath: "abi", checkoutPath: "abi", skipCheckout: true
+
+    def ctx
+    ctx = abi_get_current_context()
+    ctx['IngredientVersion'] = env.BuildVersion
+    abi_set_current_context(ctx)
+
+    log.Debug("Exit")
+}
+
+void set_custom_artifactpkg_name(String ArtifactPkgName) {
+    log.Debug("Enter")
+
+    def ctx
+    // Define custom package name for Artifacts
+    ctx = abi_get_current_context()
+    custom_name = ["ArtifactPackageFile" : "", "ArtifactPackageName" : ArtifactPkgName, "Type" : "ArtifactGen"]
+    ctx['Outputs'].add(custom_name)
+    abi_set_current_context(ctx)
+
+    log.Debug("Exit")
+}

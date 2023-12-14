@@ -235,7 +235,7 @@ pipeline {
                     BuildInfo.instance.data["Version"] = env.BuildVersion
                     PrepareWS()
                     //getBKC()
-                    sleep 360
+                    //sleep 360
                     abi_build subComponentName: "build"
                 }
             }

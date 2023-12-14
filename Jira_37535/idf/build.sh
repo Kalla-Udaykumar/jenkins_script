@@ -1,6 +1,5 @@
 set -x
 # Set up paths to dev, RT, and LTS directories.
-mkdir ${WORKSPACE}/abi/dev_path
 mkdir ${WORKSPACE}/abi/lts_path
 dev_path=${WORKSPACE}/abi/dev_path
 rt_path=${WORKSPACE}/abi/rt_path

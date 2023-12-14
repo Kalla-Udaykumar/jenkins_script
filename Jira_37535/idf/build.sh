@@ -8,6 +8,8 @@ lts_path=${WORKSPACE}/abi/lts_path
 rt_kernel=${kernel_rt}
 lts_kernel=${kernel_lts}
 
+sudo apt-get install dpkg-dev
+
 echo ${rt_kernel}
 echo ${lts_kernel}
 

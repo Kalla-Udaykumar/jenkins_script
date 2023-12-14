@@ -240,7 +240,7 @@ pipeline {
                 }
             }
         }
-        /*stage('PUBLISH') {
+        stage('PUBLISH') {
             steps {
                 script {
                     dir("${WORKSPACE}/abi/upload/") {
@@ -291,7 +291,7 @@ pipeline {
                 archiveArtifacts artifacts: "gio_result.txt"
                 }
             }
-        }*/
+        }
     }
     post {
         always {

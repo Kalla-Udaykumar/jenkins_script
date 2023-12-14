@@ -77,6 +77,6 @@ ls -la
 cp kernel.config .config
 sed -i -e "s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION=\"-ci-automation\"/" .config
 scripts/config --disable DEBUG_INFO
-#make olddefconfig && make -j12 bindeb-pkg
+make olddefconfig && make -j12 bindeb-pkg
 #rm ../linux-image-*-dbg_*.deb
 #tar -czvf release_rt.tar.gz ../*.deb

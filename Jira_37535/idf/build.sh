@@ -8,7 +8,7 @@ rt_kernel=${kernel_rt}
 lts_kernel=${kernel_lts}
 
 sudo apt-get update 
-sudo apt-get install dpkg-dev -y
+sudo apt-get install -y dpkg-dev debhelper
 
 echo ${rt_kernel}
 echo ${lts_kernel}

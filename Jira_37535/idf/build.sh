@@ -70,8 +70,8 @@ fi
 echo "========== build RT kernel =========="
 cd ${rt_path}
 ls -la
-sleep 300
-cp ../$(ls .. | grep .config) .config
+# cp ../$(ls .. | grep .config) .config
+cp kernel.config .config
 sed -i -e "s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION=\"-ci-automation\"/" .config
 scripts/config --disable DEBUG_INFO
 make olddefconfig && make -j12 bindeb-pkg

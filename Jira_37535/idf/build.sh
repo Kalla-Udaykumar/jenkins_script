@@ -79,3 +79,11 @@ scripts/config --disable DEBUG_INFO
 make olddefconfig && make -j12 bindeb-pkg
 rm ../linux-image-*-dbg_*.deb
 tar -czvf release_rt.tar.gz ../*.deb
+
+
+echo "============= Upload ouput files =============="
+cd ${WORKSPACE}/abi
+mkdir ${WORKSPACE}/abi/upload
+cp *_amd64.deb ${WORKSPACE}/abi/upload
+cp *_amd64.buildinfo *_amd64.changes ${WORKSPACE}/abi/upload
+cp ${WORKSPACE}/abi/rt_path/release_rt.tar.gz ${WORKSPACE}/abi/upload

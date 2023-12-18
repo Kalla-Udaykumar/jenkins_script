@@ -87,3 +87,7 @@ mkdir ${WORKSPACE}/abi/upload
 cp *_amd64.deb ${WORKSPACE}/abi/upload
 cp *_amd64.buildinfo *_amd64.changes ${WORKSPACE}/abi/upload
 cp ${WORKSPACE}/abi/rt_path/release_rt.tar.gz ${WORKSPACE}/abi/upload
+
+echo "=========== check upload files ========="
+cd ${WORKSPACE}/abi/upload
+ls -la

@@ -7,8 +7,8 @@ lts_path=${WORKSPACE}/abi/lts_path
 rt_kernel=${kernel_rt}
 lts_kernel=${kernel_lts}
 
-sudo apt-get update 
-sudo apt-get install -y dpkg-dev debhelper
+#sudo apt-get update 
+#sudo apt-get install -y dpkg-dev debhelper
 
 echo ${rt_kernel}
 echo ${lts_kernel}

@@ -1,0 +1,76 @@
+---
+
+daily:
+    branch:
+        dev/intel-lts-6.1/master:
+            RPL-S:
+                release_git_url: "https://github.com/intel/linux-intel-lts.git"
+                release_rt_branch: "6.1/preempt-rt"
+                release_lts_branch: "6.1/linux"
+                os_artifacts_folder_link: "https://af01p-png.devtools.intel.com/artifactory/hspe-rpl-bsp-png-local/yocto/builds/2023/release/20230601-1231/"
+                kernel_rt: "bzImage-linux-intel-iot-staging-rt-6.1-kernel"
+                kernel_lts: "bzImage-linux-intel-iot-staging-6.1-kernel"
+                kernelsrc_rt_tar: "tmp-x86-2022-glibc/linux-intel-iot-staging-rt-6.1-kernelsrc.tar.bz2"
+                kernelsrc_rt_cfg: "tmp-x86-2022-glibc/linux-intel-iot-staging-rt-6.1-kernelsrc.config"
+                kernelsrc_lts_tar: "tmp-x86-2022-glibc/linux-intel-iot-staging-6.1-kernelsrc.tar.bz2"
+                kernelsrc_lts_cfg: "tmp-x86-2022-glibc/linux-intel-iot-staging-6.1-kernelsrc.config"
+                mender_file: "tmp-x86-musl-musl/mender-initramfs-intel-corei7-64-*.rootfs.cpio.bz2"
+                gio_cmd: 
+                    Mon: "-profile 144"
+                    Tue: "-profile 144"
+                    Wed: "-profile 144"
+                    Thu: "-profile 144"
+                    Fri: "-profile 144"
+                    Sat: "-profile 144"
+                    Sun: "-profile 144"
+                email: yong.liang.choong@intel.com
+            TGL-U:
+                OneBKC_url: "https://github.com/intel-innersource/os.linux.cicd.linux-bkc-bom.git"
+                OneBKC_branch: "dummy_rpls"
+                OneBKC_file: "os.linux.cicd.linux-bkc-bom/rpls-bkc-bom.json"
+                OneBKC_ifwi: "ifwi_internal_link"
+                release_git_url: "https://github.com/intel/linux-intel-lts.git"
+                release_rt_branch: "6.1/preempt-rt"
+                release_lts_branch: "6.1/linux"
+                kernel_rt: "bzImage-linux-intel-iot-staging-rt-6.1-kernel"
+                kernel_lts: "bzImage-linux-intel-iot-staging-6.1-kernel"
+                kernelsrc_rt_tar: "tmp-x86-2022-glibc/linux-intel-iot-staging-rt-6.1-kernelsrc.tar.bz2"
+                kernelsrc_rt_cfg: "tmp-x86-2022-glibc/linux-intel-iot-staging-rt-6.1-kernelsrc.config"
+                kernelsrc_lts_tar: "tmp-x86-2022-glibc/linux-intel-iot-staging-6.1-kernelsrc.tar.bz2"
+                kernelsrc_lts_cfg: "tmp-x86-2022-glibc/linux-intel-iot-staging-6.1-kernelsrc.config"
+                mender_file: "tmp-x86-musl-musl/mender-initramfs-intel-corei7-64-*.rootfs.cpio.bz2"
+                gio_cmd: 
+                    Mon: "-profile 151"
+                    Tue: "-profile 151"
+                    Wed: "-profile 151"
+                    Thu: "-profile 151"
+                    Fri: "-profile 151"
+                    Sat: "-profile 151"
+                    Sun: "-profile 151"
+                email: yong.liang.choong@intel.com
+
+        dev/intel-lts-5.15/master:
+            ADL-S:
+                OneBKC_url: "https://github.com/intel-innersource/os.linux.cicd.linux-bkc-bom.git"
+                OneBKC_branch: "dummy_adls"
+                OneBKC_file: "os.linux.cicd.linux-bkc-bom/adls-bkc-bom.json"
+                OneBKC_ifwi: "ifwi_internal_link"
+                release_git_url: "https://github.com/intel/linux-intel-lts.git"
+                release_rt_branch: "5.15/preempt-rt"
+                release_lts_branch: "5.15/linux"
+                kernel_rt: "bzImage-linux-intel-iot-staging-rt-5.15-kernel"
+                kernel_lts: "bzImage-linux-intel-iot-staging-5.15-kernel"
+                kernelsrc_rt_tar: "tmp-x86-2021-glibc/linux-intel-iot-staging-rt-5.15-kernelsrc.tar.bz2"
+                kernelsrc_rt_cfg: "tmp-x86-2021-glibc/linux-intel-iot-staging-rt-5.15-kernelsrc.config"
+                kernelsrc_lts_tar: "tmp-x86-2021-glibc/linux-intel-iot-staging-5.15-kernelsrc.tar.bz2"
+                kernelsrc_lts_cfg: "tmp-x86-2021-glibc/linux-intel-iot-staging-5.15-kernelsrc.config"
+                mender_file: "tmp-x86-musl-musl/mender-initramfs-intel-corei7-64-*.rootfs.cpio.bz2"
+                gio_cmd: 
+                    Mon: "-profile 150"
+                    Tue: "-profile 150"
+                    Wed: "-profile 150"
+                    Thu: "-profile 150"
+                    Fri: "-profile 150"
+                    Sat: "-profile 150"
+                    Sun: "-profile 150"
+                email: yong.liang.choong@intel.com

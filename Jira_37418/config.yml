@@ -25,10 +25,7 @@ daily:
                     Sun: "-profile 144"
                 email: yong.liang.choong@intel.com
             TGL-U:
-                OneBKC_url: "https://github.com/intel-innersource/os.linux.cicd.linux-bkc-bom.git"
-                OneBKC_branch: "dummy_rpls"
-                OneBKC_file: "os.linux.cicd.linux-bkc-bom/rpls-bkc-bom.json"
-                OneBKC_ifwi: "ifwi_internal_link"
+                os_artifacts_folder_link: "https://af01p-png.devtools.intel.com/artifactory/hspe-rpl-bsp-png-local/yocto/builds/2023/release/20230601-1231/"
                 release_git_url: "https://github.com/intel/linux-intel-lts.git"
                 release_rt_branch: "6.1/preempt-rt"
                 release_lts_branch: "6.1/linux"
@@ -50,11 +47,8 @@ daily:
                 email: yong.liang.choong@intel.com
 
         dev/intel-lts-5.15/master:
-            ADL-S:
-                OneBKC_url: "https://github.com/intel-innersource/os.linux.cicd.linux-bkc-bom.git"
-                OneBKC_branch: "dummy_adls"
-                OneBKC_file: "os.linux.cicd.linux-bkc-bom/adls-bkc-bom.json"
-                OneBKC_ifwi: "ifwi_internal_link"
+            ADL-S:   
+                os_artifacts_folder_link: "https://af01p-png.devtools.intel.com/artifactory/pse-bsp-png-local/yocto/onebsp/builds/2023/release/20230217-1538/"
                 release_git_url: "https://github.com/intel/linux-intel-lts.git"
                 release_rt_branch: "5.15/preempt-rt"
                 release_lts_branch: "5.15/linux"

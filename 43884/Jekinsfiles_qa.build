@@ -124,15 +124,6 @@ pipeline {
             steps {
                 script {
                     print_node_name()
-                    
-                    checkout([$class: 'GitSCM',
-                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/drivers.ethernet.time-sensitive-networking.ese-linux-net-next.git']],
-                    branches: [[name: "${params.BRANCH}"]],
-                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/ese_linux_next_next'],
-                    [$class: 'ScmName', name: 'ese_linux_next_next'],
-                    [$class: 'CloneOption', timeout: 60],
-                    [$class: 'CleanBeforeCheckout'],
-                    [$class: 'CheckoutOption', timeout: 60]]])
 					
 		    checkout([$class: 'GitSCM',
                     userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/drivers.ethernet.time-sensitive-networking.ese-linux-net-next.git']],
@@ -144,7 +135,7 @@ pipeline {
                     [$class: 'CheckoutOption', timeout: 60]]])
 
                     checkout([$class: 'GitSCM',
-                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.jenkins.cac.git']],
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/Kalla-Udaykumar/jenkins_script.git']],
                     branches: [[name: 'master']],
                     extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/henosis'],
                     [$class: 'ScmName', name: 'henosis'],
@@ -157,7 +148,7 @@ pipeline {
         stage('ABI') {
             steps {
                script {
-                    abi.shell("cp -r ${WORKSPACE}/abi/henosis/cac/rpl/lin/icg.eth.driver/idf ${WORKSPACE}/abi")
+                    abi.shell("cp -r ${WORKSPACE}/abi/henosis/43884/idf ${WORKSPACE}/abi")
                     PrepareWS()
                 }
             }
@@ -185,6 +176,15 @@ pipeline {
                         ]
                     }"""
                     artServer.download spec: artFiles
+                }
+            }
+        }
+		stage('BUILD KERNEL') {
+            steps {
+                script {
+                    BuildInfo.instance.data["Version"] = env.BuildVersion
+                    PrepareWS()
+                    abi_build subComponentName: "rpls-igc.eth-driver"
                 }
             }
         }

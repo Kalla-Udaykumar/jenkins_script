@@ -17,5 +17,5 @@ sed -i -e '/CONFIG_MODULE_COMPRESS/d' .config
 echo "CONFIG_MODULE_COMPRESS_NONE=y" >> .config
 bash -c "echo "" | make tarxz-pkg LOCALVERSION= -j8"
 
-cp -r ${WORKSPACE}/abi/ese_linux_next_next/arch/x86/boot/bzImage ${REPORTS_DIR}
-cp -r ${WORKSPACE}/abi/ese_linux_next_next/*.tar.xz ${REPORTS_DIR}
+cp -r ${WORKSPACE}/abi/ese_linux_next_next_cov/arch/x86/boot/bzImage ${REPORTS_DIR}
+cp -r ${WORKSPACE}/abi/ese_linux_next_next_cov/*.tar.xz ${REPORTS_DIR}

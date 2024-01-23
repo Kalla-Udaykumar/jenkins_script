@@ -1,0 +1,244 @@
+#!groovy
+@Library('abi') _
+
+import owm.common.BuildInfo
+Map buildinfo = BuildInfo.instance.data
+
+email_receipients = 'jatin.wadhwa@intel.com'
+subject = '$DEFAULT_SUBJECT'
+body = '${SCRIPT, template="managed:abi.html"}'
+
+pipeline {
+    agent {
+        node {
+            label 'BSP-DOCKER19-SLES12'
+        }
+    }
+    environment {
+        DATETIME = new Date().format("yyyyMMdd-HHmm");
+        BuildVersion = "1.0.000"
+        ABI_CONTAINER = "TRUE"
+        DOCKER = "amr-registry.caas.intel.com/esc-devops/plat/ehl/yocto/eth/tsn/ubuntu1604:20221212_1824"
+    }
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '90', artifactDaysToKeepStr: '30'))
+        skipDefaultCheckout()
+    }
+    parameters {
+        booleanParam(name: 'EMAIL', defaultValue: true, description: 'Email notification upon job completion')
+        booleanParam(name: 'PUBLISH', defaultValue: true, description: 'Artifacts deployment')
+        string(name: 'BRANCH', trim: true, defaultValue: 'dev/intel-mainline-tracking-5.19/master', description: '''Git Branch, Tag, or CommitID identifier.
+        Example: refs/heads/(branch), refs/tags/(tag), full or first 7 digits of SHA-1 hash''')
+    }
+    stages {
+        stage('SCM') {
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -e PATH=/home/lab_bldmstr/bin:$PATH -v /nfs/png/home/lab_bldmstr/docker:/home/lab_bldmstr/.ssh -v /nfs/png/home/lab_bldmstr/bin:/home/lab_bldmstr/bin -v /nfs/png/home/lab_bldmstr/.gitconfig:/home/lab_bldmstr/.gitconfig -v /nfs/png/home/lab_bldmstr/.git-credentials:/home/lab_bldmstr/.git-credentials -v /nfs/png/disks/ecg_es_disk2:/build/tools'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    
+                    checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/drivers.ethernet.time-sensitive-networking.ese-linux-net-next.git']],
+                    branches: [[name: "${params.BRANCH}"]],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/ese_linux_next_next'],
+                    [$class: 'ScmName', name: 'ese_linux_next_next'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+					
+					          checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/drivers.ethernet.time-sensitive-networking.ese-linux-net-next.git']],
+                    branches: [[name: "${params.BRANCH}"]],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/ese_linux_next_next_cov'],
+                    [$class: 'ScmName', name: 'ese_linux_next_next_cov'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+
+                    checkout([$class: 'GitSCM',
+                    userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/Kalla-Udaykumar/jenkins_script.git']],
+                    branches: [[name: 'master']],
+                    extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/henosis'],
+                    [$class: 'ScmName', name: 'henosis'],
+                    [$class: 'CloneOption', timeout: 60],
+                    [$class: 'CleanBeforeCheckout'],
+                    [$class: 'CheckoutOption', timeout: 60]]])
+                }
+            }
+        }
+        stage('ABI') {
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v /nfs/png/disks/ecg_es_disk2:/build/tools'
+                    reuseNode true
+                }
+            }
+            steps {
+               script {
+                    abi.shell("cp -r ${WORKSPACE}/abi/henosis/43884/idf ${WORKSPACE}/abi")
+                    PrepareWS()
+                }
+            }
+        }
+        stage ('Download image from Artifactory') {
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v /nfs/png/home/lab_bldmstr/docker:/home/lab_bldmstr/.ssh -v /nfs/png/home/lab_bldmstr/bin:/home/lab_bldmstr/bin -v /nfs/png/home/lab_bldmstr/.gitconfig:/home/lab_bldmstr/.gitconfig -v /nfs/png/home/lab_bldmstr/.git-credentials:/home/lab_bldmstr/.git-credentials -v /nfs/png/disks/ecg_es_disk2:/build/tools'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    def artServer = Artifactory.server "af01p-png.devtools.intel.com"
+                    def artFiles  = """ {
+                        "files": [
+                            {
+                                "pattern": "hspe-adlps-png-local/yocto/adl-ps/builds/2023/PREINT/20230411-1355/tmp-x86-2022-glibc/linux-intel-iot-lts-6.1-kernelsrc.config",
+                                "target": "${WORKSPACE}/abi/ese_linux_next_next_cov/",
+                                "flat": "true"
+                            },
+                            {
+                                "pattern": "hspe-adlps-png-local/yocto/adl-ps/builds/2023/PREINT/20230411-1355/tmp-x86-musl-musl/mender-initramfs-intel-corei7-64-20230411060513.rootfs.cpio.bz2",
+                                "target": "${WORKSPACE}/abi/ese_linux_next_next_cov/",
+                                    "flat": "true",
+                                    "recursive": "true",
+                                    "sortBy": ["created"],
+                                    "sortOrder": "desc",
+                                    "limit": 1
+                            }
+                        ]
+                    }"""
+                    artServer.download spec: artFiles
+                }
+            }
+        }
+      stage('BUILD KERNEL') {
+         agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v /nfs/png/home/lab_bldmstr/docker:/home/lab_bldmstr/.ssh -v /nfs/png/home/lab_bldmstr/bin:/home/lab_bldmstr/bin -v /nfs/png/home/lab_bldmstr/.gitconfig:/home/lab_bldmstr/.gitconfig -v /nfs/png/home/lab_bldmstr/.git-credentials:/home/lab_bldmstr/.git-credentials -v /nfs/png/disks/ecg_es_disk2:/build/tools'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    BuildInfo.instance.data["Version"] = env.BuildVersion
+                    PrepareWS()
+                    abi_build subComponentName: "rpls-igc.eth-driver"
+                }
+            }
+        }
+		stage('QA: COVERITY') {
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v /nfs/png/home/lab_bldmstr/docker:/home/lab_bldmstr/.ssh -v /nfs/png/home/lab_bldmstr/bin:/home/lab_bldmstr/bin -v /nfs/png/home/lab_bldmstr/.gitconfig:/home/lab_bldmstr/.gitconfig -v /nfs/png/home/lab_bldmstr/.git-credentials:/home/lab_bldmstr/.git-credentials -v /nfs/png/disks/ecg_es_disk2:/build/tools'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    env.CoverityStream = "RPLS_LIN_IGC_ETH_DRIVER"
+                    abi.shell("mkdir -p /OWR/Tools/coverity/2022.3.1/")
+                    abi.shell("mkdir -p /OWR/Tools/cov_report/2022.3.1/")
+                    abi.shell("cp -r /build/tools/engsrv/tools/coverity-analyze/. /OWR/Tools/coverity/2022.3.1/")
+                    abi.shell("cp -r /build/tools/engsrv/tools/coverity-reports/. /OWR/Tools/cov_report/2022.3.1/")
+                    //Enable coverity scan
+                    abi_coverity_analyze server: 'https://coverityent.devtools.intel.com/prod8', stream: env.CoverityStream, version: env.BuildVersion, disable_auto_copy: true
+                     
+                }
+            }
+        }
+
+        stage("QA: VIRUS SCAN"){
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v /nfs/png/home/lab_bldmstr/docker:/home/lab_bldmstr/.ssh -v /nfs/png/home/lab_bldmstr/bin:/home/lab_bldmstr/bin -v /nfs/png/home/lab_bldmstr/.gitconfig:/home/lab_bldmstr/.gitconfig -v /nfs/png/home/lab_bldmstr/.git-credentials:/home/lab_bldmstr/.git-credentials -v /nfs/png/disks/ecg_es_disk2:/build/tools'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh"""mkdir -p ${WORKSPACE}/upload """
+                sh"""cp -r ${WORKSPACE}/abi/OWRBuild/BuildData/VirusScan/RPLS-LIN-ETH.DRIVER_McAfee.log ${WORKSPACE}/upload """
+                sh"""cp -r ${WORKSPACE}/abi/OWRBuild/cov-int_${env.CoverityStream}/${env.CoverityStream}/*.pdf ${WORKSPACE}/upload """
+                sh"""cp -r ${WORKSPACE}/abi/OWRBuild/cov-int_${env.CoverityStream}/output/summary.txt ${WORKSPACE}/upload """
+                
+                // Scan Upload folder
+                abi_scan_virus reportname: "RPLS-LIN-ETH.DRIVER", target: "${WORKSPACE}/upload", auditreport: false, disable_auto_copy: true
+            }
+        }
+        stage("PUBLISH") {
+              agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v /nfs/png/home/lab_bldmstr/docker:/home/lab_bldmstr/.ssh -v /nfs/png/home/lab_bldmstr/bin:/home/lab_bldmstr/bin -v /nfs/png/home/lab_bldmstr/.gitconfig:/home/lab_bldmstr/.gitconfig -v /nfs/png/home/lab_bldmstr/.git-credentials:/home/lab_bldmstr/.git-credentials -v /nfs/png/disks/ecg_es_disk2:/build/tools'
+                    reuseNode true
+                }
+            }
+             steps {
+                script {
+                        
+                        //upload to artifactory
+                        abi_artifact_deploy custom_file: "${WORKSPACE}/upload/",custom_deploy_path: "hspe-rpls-png-local/rpls_igc_lts_eth_driver/${UPSTREAM_DATE}/QA-Reports", custom_artifactory_url: "https://af01p-png.devtools.intel.com", cred_id: 'BuildAutomation'
+                }
+            }
+        }
+
+    }
+    post {
+        always {
+            script {
+                // To trigger Log Parser build to push Build log to Splunk Server.
+                build job: 'iotgdevops01/ADM-LOG_PARSER',
+                parameters: [ stringParam(name: 'JOB_RESULT', value: "${currentBuild.result}"),
+                stringParam(name: 'BUILD_URL', value: "${env.BUILD_URL}"), booleanParam(name: 'SPLUNK', value: true)
+                ], wait: false, propagate: false
+
+                if (params.EMAIL == true) {
+                    abi_send_email.SendEmail("${email_receipients}","${body}","${subject}")
+                }
+            }
+        }
+    }
+}
+
+// Prepare the workspace for the ingredient
+void PrepareWS(String BuildConfig="idf/BuildConfig.json") {
+    log.Debug("Enter")
+
+    log.Info("This build is running on Node:${env.NODE_NAME} WorkSpace: ${env.WORKSPACE}")
+
+    abi_setup_proxy()
+    
+    abi_init config: BuildConfig, ingPath: "abi", checkoutPath: "abi", skipCheckout: true
+
+    def ctx
+    ctx = abi_get_current_context()
+    ctx['IngredientVersion'] = env.BuildVersion
+    abi_set_current_context(ctx)
+
+    log.Debug("Exit")
+}
+
+void set_custom_artifactpkg_name(String ArtifactPkgName) {
+    log.Debug("Enter")
+
+    def ctx
+    // Define custom package name for Artifacts
+    ctx = abi_get_current_context()
+    custom_name = ["ArtifactPackageFile" : "", "ArtifactPackageName" : ArtifactPkgName, "Type" : "ArtifactGen"]
+    ctx['Outputs'].add(custom_name)
+    abi_set_current_context(ctx)
+
+    log.Debug("Exit")
+}

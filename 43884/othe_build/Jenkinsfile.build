@@ -1,2 +1,0 @@
-#!groovy
-@Library('abi@2.4.0') _

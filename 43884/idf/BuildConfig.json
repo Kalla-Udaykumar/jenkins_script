@@ -48,7 +48,7 @@
 		{
             "Name": "cov-rpls-igc.eth-driver",
             "Description": "RPLS IGC.ETH DRIVER Script App for COV",
-            "ProjectFile": "./cov_build.sh",
+            "ProjectFile": "./coverity_old.sh",
             "ProjectType": "Script",
             "WorkingDirectory": "idf",
             "AdditionalFlags": "",

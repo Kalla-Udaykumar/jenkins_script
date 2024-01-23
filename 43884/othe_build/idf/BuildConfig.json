@@ -1,0 +1,63 @@
+{
+    "IngredientName": "rpl-igc.eth-driver",
+    "Description": "IDF ABI Project Config File for RPLS IGC ETH DRIVER Ingredient",
+    "OutputConfiguration": "idf/PackageGen.json",
+    "OutputRoot": "OWRBin",
+    "OutputDir": "OWRBuild",
+    "PackageRoot": "OWRPackage",
+    "PackageMetadataTemplate": "idf/PackageMetadataTemplate.json",
+    "BuildInfo":{
+        "Name":"Test_setup",
+        "FullName":"",
+        "SDL": [
+            {
+                "ID": "",
+                "URL": "",
+                "Submitter": "lab_bldmstr"
+            }
+        ],
+        "ServerURL":"https://onebkc.intel.com",
+        "Type":"onebkc"
+    },
+    "VulnerabilityScan": {
+        "ServerURL": "https://snyk.devtools.intel.com/api"
+    },
+    "Protex": {
+        "Server": "amrprotex003.devtools.intel.com",
+        "ProjectID": "c_iotg_seg_sed_ese_ethernet-tsn_driver_rpl-s_23823"
+    },
+    "BinaryScan": {
+        "ServerURL": "https://bdba001.icloud.intel.com",
+        "ServerGroup": "52"
+    },
+    "StaticSecurityScan": {
+        "ServerURL": "https://sast.intel.com",
+        "ProjectID": "336687",
+        "IsPublic": true
+    },
+    "SubComponents": [
+        {
+            "Name": "i226-test",
+            "Description": "RPLS IGC.ETH DRIVER Script App",
+            "ProjectFile": "./build.sh",
+            "ProjectType": "Script",
+            "WorkingDirectory": "idf",
+            "AdditionalFlags": "",
+            "AdditionalEnvVars": ""
+        },
+		{
+            "Name": "cov-rpls-igc.eth-driver",
+            "Description": "RPLS IGC.ETH DRIVER Script App for COV",
+            "ProjectFile": "./cov_build.sh",
+            "ProjectType": "Script",
+            "WorkingDirectory": "idf",
+            "AdditionalFlags": "",
+            "AdditionalEnvVars": "",
+            "Coverity":{
+                "Stream": "ENV:CoverityStream",
+                "SkipCoverityScan": false
+            }
+        }
+    ],    
+    "SchemaVersion": "1.0"
+}

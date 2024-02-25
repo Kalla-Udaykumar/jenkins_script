@@ -106,6 +106,9 @@ pipeline {
         DATETIME = new Date().format("yyyyMMdd-HHmm");
         BuildVersion = "1.0.000"
         ABI_CONTAINER = "TRUE"
+	BDBA_SCAN_DIR = "BDBA_SCAN"
+	REPORTS_DIR = "${WORKSPACE}/abi/ubuntu_kernel/drivers/net/ethernet/intel/igc"
+
     }
     options {
         timestamps()
@@ -186,6 +189,19 @@ pipeline {
                     PrepareWS()
                     abi_build subComponentName: "i226-test"
                 }
+            }
+        }
+
+	    stage('QA: BDBA') {
+            steps {
+                 dir("${REPORTS_DIR}/${BDBA_SCAN_DIR}") {
+                    deleteDir()
+                }
+                dir("${REPORTS_DIR}") {
+                    zip(zipFile: "${BDBA_SCAN_DIR}/${JOB_BASE_NAME}.zip")
+                }
+                //Enable BDBA Scan on the final Package
+                abi_scan_binary timeout: 2000, zip_file: "${REPORTS_DIR}/${BDBA_SCAN_DIR}/${JOB_BASE_NAME}.zip", wait: true, report_name: "ASL-LIN-UBUNTU", auditreport: false, custom_data: "TEAMNAME ASL-LIN-UBUNTU"
             }
         }
 		/*stage('QA: COVERITY') {

@@ -97,7 +97,6 @@ pipeline {
         BDBA_SCAN_DIR = "BDBA_SCAN"
         REPORTS_DIR = "${WORKSPACE}/upload"
         DC_TEAMNAME = "GVP-LIN-MIPS"
-        DATETIME = new Date().format("yyyyMMdd-HHmm");
         ARTIFACTORY_REPO = "hspe-mips-png-local/daily/linux/build"
         ARTIFACTORY_SERVER = "af01p-png.devtools.intel.com"
         DOCKER_IMG = "amr-registry.caas.intel.com/esc-apps/gio/ubuntu18.04:20210927_1110"

@@ -1,0 +1,74 @@
+{
+    "IngredientName": "MIPS OBSERVABILITY",
+    "Description": "MIPS Project Config File for OBSERVABILITY Ingredient",
+    "OutputConfiguration": "idf/PackageGen.json",
+    "OutputRoot": "OWRBin",
+    "OutputDir": "OWRBuild",
+    "PackageRoot": "OWRPackage",
+    "PackageMetadataTemplate": "idf/PackageMetadataTemplate.json",
+    "BuildInfo":{
+        "Name":"",
+        "FullName":"",
+        "SDL": [
+            {
+                "ID": "",
+                "URL": "",
+                "Submitter": "lab_bldmstr"
+            }
+        ],
+        "ServerURL":"https://onebkc.intel.com",
+        "Type":"onebkc"
+    },
+    "VulnerabilityScan": {
+        "ServerURL": "https://snyk.devtools.intel.com/api"
+    },
+    "Protex": {
+        "Server": "amrprotex008.devtools.intel.com",
+        "ProjectID": "c_gvp_observability_26123"
+    },
+    "BinaryScan": {
+        "ServerURL": "https://bdba001.icloud.intel.com",
+        "ServerGroup": "52"
+    },
+    "StaticSecurityScan": {
+        "ServerURL": "https://sast.intel.com",
+        "ProjectID": "336687",
+        "IsPublic": true
+    },
+    "Klocwork": {
+        "ServerURL": "https://klocwork-png7.devtools.intel.com",
+        "ServerPort": "8105",
+        "LicenseHost": "klocwork05p.elic.intel.com",
+        "LicensePort": "7500",
+        "OutputConfiguration": "",
+        "OnErrorContinueAnalysis":true,
+        "OverWriteDuplicates": true
+    },
+    "SubComponents": [
+        {
+            "Name": "build",
+            "Description": "MIPS OBSERVABILITY SCM and BUILD",
+            "ProjectFile": "./build.sh",
+            "ProjectType": "Script",
+            "WorkingDirectory": "idf",
+            "AdditionalFlags": "",
+            "AdditionalEnvVars": ""
+            }
+        },
+	{
+            "Name": "GVP-LIN-OBSERVABILITY",
+            "Description": "GVP Script App for Coverity",
+            "ProjectFile": "./cov_build.sh",
+            "ProjectType": "Script",
+            "WorkingDirectory": "idf",
+            "AdditionalFlags": "",
+            "AdditionalEnvVars": "",
+            "Coverity":{
+                "Stream": "ENV:CoverityStream",
+                "SkipCoverityScan": false
+            }
+        }
+		
+    ],    
+    "SchemaVersion": "1.0"
+}

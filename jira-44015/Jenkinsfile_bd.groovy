@@ -123,7 +123,7 @@ pipeline {
                         checkout([$class: 'GitSCM',
                         userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/applications.iot.tools.rpbs.mips.git']],
                         branches: [[name: "master"]],
-                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'mips'],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/mips'],
                         [$class: 'ScmName', name: 'mips'],
                         [$class: 'CleanBeforeCheckout']]])
                     },
@@ -131,7 +131,7 @@ pipeline {
                         checkout([$class: 'GitSCM',
                         userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/applications.services.gvp.observability.git']],
                         branches: [[name: "${BRANCH_NAME}"]],
-                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'applications.services.gvp.observability'],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/applications.services.gvp.observability'],
                         [$class: 'ScmName', name: 'applications.services.gvp.observability'],
                         [$class: 'CleanBeforeCheckout']]])
                     },
@@ -139,7 +139,7 @@ pipeline {
                         checkout changelog: false, scm: ([$class: 'GitSCM',
                         userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.henosis.build.automation.services.git']],
                         branches: [[name: 'refs/heads/master']],
-                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'esc-engservices'],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/esc-engservices'],
                         [$class: 'CleanBeforeCheckout']]])
                     },
                     "henosis-repo": {

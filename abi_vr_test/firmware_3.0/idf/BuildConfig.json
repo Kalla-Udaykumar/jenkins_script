@@ -2,7 +2,6 @@
     "IngredientName":"ADLS_SBL",
     "Description":"ADLS FIRMWARE SBL Project",
     "OutputConfiguration":"idf/PackageGen.json",
-    "SchemaVersion":"1.0",
     "OutputRoot":"OWRBin",
     "OutputDir":"OWRBuild",
     "PackageRoot":"OWRPackage",

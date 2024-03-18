@@ -1,0 +1,298 @@
+#!groovy
+@Library(['abi', 'pipeline-info']) _
+
+import owm.common.BuildInfo
+Map buildinfo = BuildInfo.instance.data
+
+/**
+  * ADLS FIRMWARE SBL BD Project
+  *
+**/
+email_receipients = "nex.bootloader.team@intel.com"
+subject = '$DEFAULT_SUBJECT'
+body = '${SCRIPT, template="managed:abi.html"}'
+
+def DATESTRING = new Date().format("yyyyMMdd-HHmm")
+def REL_N = ""
+def REL_NAME_LIST = []
+def REL_T = ""
+if (params.RELEASE_NAME && params.RELEASE_NAME.length() != 0) {
+    REL_NAME_LIST << "${params.RELEASE_NAME}".replace(' ', '')
+}
+else {
+    REL_NAME_LIST << "SBL_ADLS_${DATESTRING}"
+}
+
+REL_N = REL_NAME_LIST[0]
+
+if (params.RELEASE_TAG && params.RELEASE_TAG.length() != 0)
+{
+    REL_T = "-t ${params.RELEASE_TAG}"
+}
+
+def REPO_NAME = ["firmware.boot.bootloader.sbl.sblplatform", "firmware.boot.bootloader.sbl.uefipldplatform"]
+
+pipeline {
+    agent
+    {
+        node
+        {
+            label 'WIN-CONTAINER'
+            customWorkspace "C:\\alsb"
+        }
+    }
+
+    // =======================================================================
+    // GLOBAL ENVIRONMENT SETTINGS
+    // =======================================================================
+    environment {
+        DATETIME = new Date().format("yyyy.MM.dd.HH");
+        ZIP_FILE = "${WORKSPACE}\\abi\\${REL_N}\\${REL_N}.zip"
+        API_ID = credentials('github-api-token')
+        DATE = new Date().format("yyyy.MM.dd")
+        TIME=new Date().format("HHmmss")
+        REL_NAME = "${REL_N}"
+        REL_TAG = "${REL_T}"
+		DOCKER = "amr-registry.caas.intel.com/esc-devops/plat/rpl/firmware/sbl/windows10/abi:202303090900"
+        BuildVersion = "1.0.000"
+        ABI_CONTAINER = false
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '90', artifactDaysToKeepStr: '30'))
+        skipDefaultCheckout()
+    }
+    parameters {
+        booleanParam(name: 'CLEANWS', defaultValue: true, description: 'Clean workspace')
+        booleanParam(name: 'EMAIL', defaultValue: true, description: 'Email notification upon job completion')
+        booleanParam(name: 'PUBLISH', defaultValue: true, description: 'Artifacts deployment')
+        booleanParam(name: 'QA', defaultValue: true, description: 'To run QA SBL-GENERIC-QA-DLY.GITLAB upon build completion.')
+        string(name: 'BRANCH_SBLPLATFORM', defaultValue: 'refs/heads/master',
+                    description: 'Git Branch, Tag, or CommitID identifier. Example: refs/heads/(branch), refs/tags/(tag), or first 7 digits of SHA-1 hash')
+        string(name: 'BRANCH_SBLUTILITIES', defaultValue: 'refs/heads/master',
+                    description: 'Git Branch, Tag, or CommitID identifier. Example: refs/heads/(branch), refs/tags/(tag), or first 7 digits of SHA-1 hash')
+        string(name: 'BRANCH_UEFIPAYLOAD', defaultValue: 'refs/heads/edk2-stable202008',
+                    description: 'Git Branch, Tag, or CommitID identifier. Example: refs/heads/(branch), refs/tags/(tag), or first 7 digits of SHA-1 hash')
+        string(name: 'RELEASE_TAG', defaultValue: '',
+                    description: 'This tag should be the common part for SBL, UEFI and utility repo. Used only by release.py, e.g. TGL_ALPHA_RC1')
+        string(name: 'RELEASE_NAME', defaultValue: '',
+                    description: 'If left blank, release name is default to the format of SBL_&lt;PLATFORM&gt;_&lt;DATETIME&gt;, e.g. SBL_EHL_20200109-2316')
+    }
+    stages {
+        stage ('CLEAN') {
+            when {
+                expression { params.CLEANWS == true }
+            }
+            steps {
+                script {
+                    abi_workspace_clean deleteDirs: true 
+                }
+            }
+        }
+        stage('SCM') {
+            steps {
+                parallel(
+                    "mini_loader-platform": {
+                        abi_checkout([$class: 'GitSCM',
+                        userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/firmware.boot.bootloader.sbl.sblplatform.git']],
+                        branches: [[name: "${params.BRANCH_SBLPLATFORM}"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "abi/SblPlatform"],
+                        [$class: 'ScmName', name: 'sblplatform'],
+                        [$class: 'CloneOption', timeout: 90],
+                        [$class: 'CleanBeforeCheckout'],
+                        [$class: 'AuthorInChangelog'],
+                        [$class: 'CheckoutOption', timeout: 90]]])
+                    },
+                    "mini_loader-utilities": {
+                        abi_checkout([$class: 'GitSCM',
+                        userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/firmware.boot.bootloader.sbl.utilities.git']],
+                        branches: [[name: "${params.BRANCH_SBLUTILITIES}"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "abi/utilities"],
+                        [$class: 'ScmName', name: 'utilities'],
+                        [$class: 'CloneOption', timeout: 90],
+                        [$class: 'CleanBeforeCheckout'],
+                        [$class: 'AuthorInChangelog'],
+                        [$class: 'CheckoutOption', timeout: 90]]])
+                    },
+                    "mini_loader-uefipldplatform": {
+                        abi_checkout([$class: 'GitSCM',
+                        userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/firmware.boot.bootloader.sbl.uefipldplatform.git']],
+                        branches: [[name: "${params.BRANCH_UEFIPAYLOAD}"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: "abi/Uefipldplatform"],
+                        [$class: 'ScmName', name: 'uefipldplatform'],
+                        [$class: 'CloneOption', timeout: 120],
+                        [$class: 'CleanBeforeCheckout'],
+                        [$class: 'AuthorInChangelog'],
+                        [$class: 'CheckoutOption', timeout: 120]]])
+                    },
+                    "esc-cac": {
+                        checkout([$class: 'GitSCM',
+                        userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.jenkins.cac.git']],
+                        branches: [[name: 'refs/heads/master']],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/henosis'],
+                        [$class: 'ScmName', name: 'henosis'],
+                        [$class: 'CleanBeforeCheckout'],
+                        [$class: 'CloneOption', timeout: 60],
+                        [$class: 'CheckoutOption', timeout: 60]]])
+                    }
+                )
+            }
+        }
+		stage('ABI') {
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= '
+                    reuseNode true
+                }
+            }
+            steps { 
+               script {
+                    bat """ xcopy /E /I ${WORKSPACE}\\abi\\henosis\\cac\\slimboot\\pipeline\\daily_bkc\\adl\\idf ${WORKSPACE}\\abi\\idf """
+                    bat """ mkdir ${WORKSPACE}\\abi\\OWRBin """
+                    PrepareWS()
+                } 
+            }
+        }
+		stage ('BUILD') {
+		    agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v C:/Users/lab_bldmstr:C:/lab_bldmstr'
+                    reuseNode true
+                }
+            }
+            steps{
+				script {
+				    bat""" cmd /s /c "copy C:\\lab_bldmstr\\.gitconfig C:\\Users\\lab_bldmstr\\ &&  copy C:\\lab_bldmstr\\.git-credentials C:\\Users\\lab_bldmstr\\" """
+                    BuildInfo.instance.data["Version"] = env.BuildVersion
+                    abi_build subComponentName: "ADLSFirmwareSBLBuildApp"
+                }
+            }
+        }
+		stage("QA: BDBA Scan") {
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v C:/ABI:C:/OWR/Tools'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    //Enable BDBA Scan on the final Package
+                    abi_scan_binary timeout: 2000, wait: true, report_name: "ADLS-FW-SBL-BD", auditreport: true, zip_file: "${ZIP_FILE}"
+                }
+            }
+        }
+		stage('QA-VIRUS-SCAN') {
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v C:/ABI:C:/OWR/Tools'
+                    reuseNode true
+                }
+            }
+            steps { 
+                script {
+                    //Enable Virus Scan
+                    PrepareWS()
+					bat """ xcopy /E /I ${WORKSPACE}\\abi\\OWRBuild\\binary\\binary*.csv ${WORKSPACE}\\abi\\upload
+                    xcopy /E /I ${WORKSPACE}\\abi\\OWRBuild\\binary\\binary*.pdf ${WORKSPACE}\\abi\\upload 
+                    xcopy /E /I ${ZIP_FILE} ${WORKSPACE}\\abi\\upload 
+					xcopy /E /I ${WORKSPACE}\\abi\\${REL_NAME}\\Validation.zip ${WORKSPACE}\\abi\\upload """
+                    abi_scan_virus target: "${WORKSPACE}/abi/upload", reportname: "ADLS-FW-SBL-BD", auditreport: false
+					bat """ xcopy /E /I ${WORKSPACE}\\abi\\OWRBuild\\BuildData\\VirusScan\\*.html ${WORKSPACE}\\abi\\upload """
+                }    
+            }
+        }
+		stage('PUBLISH') {
+            when {
+                expression { params.PUBLISH == true }
+            }
+            agent {
+                docker {
+                    image "${DOCKER}"
+                    args '--entrypoint= -v C:/ABI:C:/OWR/Tools'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                        abi_artifact_deploy custom_file: "${WORKSPACE}/abi/upload", custom_deploy_path: "PED-Bootloader-and-FSP-local/SBL_BKC/ADLS/${REL_NAME}", custom_artifactory_url: "https://ubit-artifactory-or.intel.com", additional_props: "retention.days=365", cred_id: 'BuildAutomation'
+                        
+                }
+            }
+        }
+    }
+    post {
+        always {
+            checkout([$class: 'GitSCM',
+            userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.henosis.dashboards.datachart.configuration.git']],
+            branches: [[name: 'refs/heads/master']],
+            extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir:'engservices'],
+            [$class: 'CloneOption', timeout: 60],
+            [$class: 'CheckoutOption', timeout: 60]]])
+
+            script {
+                for(repo in REPO_NAME){
+                    dir("${WORKSPACE}/engservices/controllers") {
+                        def output = sh (returnStdout: true, script: """/usr/bin/python3 controller-post-nightlybuild.py --token=${API_ID} --org=intel-innersource --repo=${repo} --branch=nightlybuild-cicd --logs=${DATE}-${TIME}-${BUILD_NUMBER}-${BUILD_URL} --result=NightlyBuild+${DATE}+${JOB_NAME}+${BUILD_NUMBER}""").trim()
+                        println("The SHA for the new commit is ${output}")                   
+                        
+                        def results = pipelineResults()
+                        for(stage in results.keySet()){
+                            println("Stage: ${stage} || Status: ${results[stage]['result']} || Duration: ${results[stage]['duration']}")
+                            println("-----------------")
+                            //TODO: Update curl url as env variable
+                            sh """
+                                curl -s -H "Authorization: token ${API_ID}" -H "Content-Type: application/json" -X POST -d '{"state": "${results[stage]['result'].toString().toLowerCase()}", "target_url": "${BUILD_URL}console", "description": "Status: ${results[stage]['result']} || Total duration: ${results[stage]['duration']}", "context": "ci/${stage}"}' "https://api.github.com/repos/intel-innersource/${repo}/statuses/${output}"
+                            """
+                        }    
+                    }
+                }
+                // To trigger Log Parser build to push Build log to Splunk Server.
+                build job: 'iotgdevops01/ADM-LOG_PARSER',
+                parameters: [ stringParam(name: 'JOB_RESULT', value: "${currentBuild.result}"),
+                stringParam(name: 'BUILD_URL', value: "${env.BUILD_URL}"), booleanParam(name: 'SPLUNK', value: true)
+                ], wait: false, propagate: false
+
+                if (params.EMAIL == true) {
+                     abi_send_email.SendEmail("${email_receipients}","${body}","${subject}")
+                }
+            }
+        }
+        success {
+            script {
+                if (params.QA == true) {
+				    // build job: "iotgdevops01/ESC/JIANCHER/test-icx-sbl-qa", parameters: [string(name: 'UPSTREAM_TARGET', value: "${params.TARGET}"), \
+                    build job: "ADLS-FIRMWARE-SBL-QA-DLY", parameters: [string(name: 'UPSTREAM_TARGET', value: "${params.TARGET}"), \
+                    string(name: 'UPSTREAM_RELEASE_NAME', value: "${REL_NAME}"), string(name: 'UPSTREAM_DATESTRING', value: "${DATESTRING}"), \
+                    string(name: 'UPSTREAM_BR_PLATFORM', value: "${params.BRANCH_SBLPLATFORM}"), string(name: 'UPSTREAM_BR_UEFI', value: "${params.BRANCH_UEFIPAYLOAD}"), \
+                    booleanParam(name: 'CLEANWS', value: true), booleanParam(name: 'EMAIL', value: true), booleanParam(name: 'PUBLISH', value: true)], \
+                    wait: false
+                }
+            }
+        }
+    }
+}
+
+// Prepare the workspace for the ingredient
+void PrepareWS(String BuildConfig="${WORKSPACE}/abi/idf/BuildConfig.json") {
+    log.Debug("Enter")
+
+    log.Info("This build is running on Node:${env.NODE_NAME} WorkSpace: ${env.WORKSPACE}")
+
+    abi_setup_proxy()
+
+    abi_init config: BuildConfig, ingPath: "abi", checkoutPath: "abi", skipCheckout: true
+
+    def ctx
+    ctx = abi_get_current_context()
+    ctx['IngredientVersion'] = env.BuildVersion
+    abi_set_current_context(ctx)
+
+    log.Debug("Exit")
+}

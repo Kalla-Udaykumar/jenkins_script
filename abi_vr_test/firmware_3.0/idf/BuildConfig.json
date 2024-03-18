@@ -1,0 +1,58 @@
+{
+    "IngredientName":"ADLS_SBL",
+    "Description":"ADLS FIRMWARE SBL Project",
+    "OutputConfiguration":"idf/PackageGen.json",
+    "SchemaVersion":"1.0",
+    "OutputRoot":"OWRBin",
+    "OutputDir":"OWRBuild",
+    "PackageRoot":"OWRPackage",
+    "PackageMetadataTemplate":"idf/PackageMetadataTemplate.json",
+	"BinaryScan": {
+        "ServerURL": "https://bdba001.icloud.intel.com",
+        "ServerGroup": "52"
+    },
+	"Protex": {
+        "Server": "garprotex009.devtools.intel.com",
+        "ProjectID": "c_training2_16468"
+    },
+    "SubComponents":[
+	{
+            "Name":"ADLSFirmwareSBLBuildApp",
+            "Description":"ADLS Firmware SBL BD",
+            "ProjectFile":"build.bat",
+            "AdditionalFlags": "",
+            "WorkingDirectory": "idf",
+            "ProjectType":"Script",
+        "Coverity":{ 
+                "SkipCoverityScan": true
+            }			
+        },    
+        {
+            "Name":"ADLSFirmwareSBLCovApp",
+            "Description":"ADLS Firmware SBL COV QA",
+            "ProjectFile":"build_cov.bat",
+            "AdditionalFlags": "",
+            "WorkingDirectory": "idf",
+            "ProjectType":"Script",
+	    "Coverity":{
+                "Stream": "ADLS_FIRMWARE_SBL",
+		"CompilerTemplates":["cs","msvc"],     
+                "SkipCoverityScan": false
+            }
+        },
+        {
+            "Name":"ADLSFirmwareSBLCovUefiApp",
+            "Description":"ADLS Firmware SBL COV UEFI QA",
+            "ProjectFile":"build_cov_uefi.bat",
+            "AdditionalFlags": "",
+            "WorkingDirectory": "idf",
+            "ProjectType":"Script",
+	    "Coverity":{
+                "Stream": "ADLS_FIRMWARE_SBL_UEFIPLD",
+		"CompilerTemplates":["cs","msvc"],     
+                "SkipCoverityScan": false
+            }
+        }
+    ],    
+    "SchemaVersion": "1.0"
+}

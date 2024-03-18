@@ -129,7 +129,7 @@ pipeline {
                     },
                     "esc-cac": {
                         checkout([$class: 'GitSCM',
-                        userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/intel-innersource/libraries.devops.jenkins.cac.git']],
+                        userRemoteConfigs: [[credentialsId: 'GitHub-Token', url: 'https://github.com/Kalla-Udaykumar/jenkins_script.git']],
                         branches: [[name: 'refs/heads/master']],
                         extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'abi/henosis'],
                         [$class: 'ScmName', name: 'henosis'],
@@ -150,7 +150,7 @@ pipeline {
             }
             steps { 
                script {
-                    bat """ xcopy /E /I ${WORKSPACE}\\abi\\henosis\\cac\\slimboot\\pipeline\\daily_bkc\\adl\\idf ${WORKSPACE}\\abi\\idf """
+                    bat """ xcopy /E /I ${WORKSPACE}\\abi\\henosis\\abi_vr_test\\firmware_3.0\\idf ${WORKSPACE}\\abi\\idf """
                     bat """ mkdir ${WORKSPACE}\\abi\\OWRBin """
                     PrepareWS()
                 } 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #export PATH=${PATH}:/usr/local/anaconda/bin && mkdir ${WORKSPACE}/upload
-cd ${WORKSPACE}/abi/mips
+cd ${WORKSPACE}/mips
 #export TENSORFLOW_CPU_LIB_PATH=/opt/intel/tf_lib
 #export Torch_DIR=/opt/intel/ptlibs/libtorch/share/cmake/Torch
 #export PYTORCH_CPU_LIB_PATH=/opt/intel/ptlibs/libtorch

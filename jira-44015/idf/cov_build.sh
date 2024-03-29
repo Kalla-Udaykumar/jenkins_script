@@ -11,10 +11,10 @@ export OpenCV_INSTALL_DIR=/opt/intel/openvino_2022/opencv/build/install
 export OpenCV_DIR=/opt/intel/openvino_2022/opencv/build/install/cmake
 export LD_LIBRARY_PATH=/opt/intel/openvino_2022/opencv/build/install/lib
 export PYTHONPATH=/opt/intel/openvino_2022/opencv/build/install/python
-source /opt/intel/openvino_2022/setupvars.sh
-source /opt/intel/oneapi/setvars.sh
 mkdir build
 cd build
+source /opt/intel/openvino_2022/setupvars.sh
+source /opt/intel/oneapi/setvars.sh
 cmake /build/cje/workspace/iotgdevops01/NON_PROD/UKALLA/44015-QA-Pipeline-2/mips/CMakeLists.txt -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=1 -DCMAKE_INSTALL_PREFIX=${WORKSPACE}/mips-binary
 make -j{nproc}
 make install

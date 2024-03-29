@@ -15,6 +15,6 @@ source /opt/intel/openvino_2022/setupvars.sh
 source /opt/intel/oneapi/setvars.sh
 mkdir build
 cd build
-cmake ${WORKSPACE}/mips/CMakeLists.txt -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=1 -DCMAKE_INSTALL_PREFIX=${WORKSPACE}/mips-binary
+cmake /build/cje/workspace/iotgdevops01/NON_PROD/UKALLA/44015-QA-Pipeline-2/mips/CMakeLists.txt -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=1 -DCMAKE_INSTALL_PREFIX=${WORKSPACE}/mips-binary
 make -j{nproc}
 make install

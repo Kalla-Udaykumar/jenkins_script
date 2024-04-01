@@ -16,7 +16,7 @@ source /opt/intel/oneapi/setvars.sh
 mkdir build
 cd build
 cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=1 -DCMAKE_INSTALL_PREFIX=${WORKSPACE}/abi/mips-binary
-make -j\$(nproc)
+# make -j\$(nproc)
 make install
 cp -r ${WORKSPACE}/abi/mips-binary/bin/mips_ut ${WORKSPACE}/upload/
 cd ${WORKSPACE}/abi/
